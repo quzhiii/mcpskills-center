@@ -1,0 +1,30 @@
+{
+  "name": "mcpskills-center",
+  "version": "0.1.0",
+  "description": "Unified MCP and skills management, audit, sync, and visualization platform for Claude Code, OpenCode, and Codex",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "scan": "node dist/index.js scan",
+    "audit": "node dist/index.js audit",
+    "sync": "node dist/index.js sync",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "mcp",
+    "skills",
+    "claude",
+    "opencode",
+    "codex",
+    "agent",
+    "inventory",
+    "audit"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
