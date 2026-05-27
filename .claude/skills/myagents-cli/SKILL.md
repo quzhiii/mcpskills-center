@@ -1,0 +1,464 @@
+---
+name: myagents-cli
+description: >-
+  你正在 MyAgents 这款 AI 产品里运行——MyAgents 自带一套"产品能力"（定时任务、任务中心、想法收集、MCP 工具接入、
+  模型 Provider、IM Bot 渠道、社区插件、Skills 安装、Generative UI Widget 等），全部通过内置 `myagents` CLI 暴露给你。
+  当用户的需求**落在 MyAgents 产品能力的射程内**，就加载并使用这个 skill，用 CLI 主动帮用户把事情做掉，
+  而不是让用户去 GUI 点击。
+  典型触发场景：用户说"每天 X 点帮我 Y"（→ cron）、"记一下这个想法"（→ thought）、"派发成任务"（→ task）、
+  "接个 X 工具进来"（→ mcp）、"配 X 模型/Provider"（→ model）、"在飞书/钉钉/Telegram 里跟我聊"（→ agent channel）、
+  "装个 X 插件 / 装个 X skill"（→ plugin / skill）、"把图发到 IM 里"（→ im send-media）、"做个图表/仪表盘"
+  （→ widget readme）、"看下我有啥任务/定时/Runtime/版本"（→ list / status / version）、"改下应用设置"（→ config）。
+  即使用户没说"用 MyAgents 做"几个字，只要意图能映射到上述能力之一，就该走这个 skill。
+  反向边界：纯业务任务（写代码、查资料、读文件）不归这里；用户自己会话里给 AI 排任务用 im-cron MCP，不是这里。
+author: MyAgents
+---
+
+# myagents-cli — MyAgents 产品能力的 CLI 入口
+
+你正运行在 MyAgents 产品内。MyAgents 不只是一个 chat UI，它是一套带状态的 Agent 平台：定时任务、任务中心、IM Bot、MCP、Provider、插件、Skill、Widget——这些都是产品能力，由内置 `myagents` CLI 一站暴露给你。
+
+**这个 skill 不只是"管理工具"，它是 MyAgents 产品能力的执行入口**。用户表达的需求只要能映射到产品能力，就该用 CLI 主动帮用户做掉，而不是给用户一堆操作步骤让他自己去 Settings 点。这份文档列出全部能力以及"什么时候应该用哪条命令"。
+
+## 前置：CLI 是否可用
+
+CLI 通过 `~/.myagents/bin/myagents` 暴露，你的 SDK 子进程 PATH 已注入这个目录，直接 `myagents <command>` 就能跑。它通过 HTTP 走 Sidecar Admin API（端口由环境变量 `MYAGENTS_PORT` 注入）。
+
+- 遇到 `command not found`：让用户重启一次应用触发 CLI 同步
+- 遇到 `ECONNREFUSED`：Sidecar 没起来，让用户检查应用是否在运行
+
+## 使用模式
+
+1. **探索先行**：不熟的命令组用 `myagents <group> --help`；不知道某个 runtime 支持什么 model/permissionMode 用 `myagents runtime describe <runtime>`，**不要靠猜**
+2. **预览写操作**：所有写命令支持 `--dry-run`，先给用户看会改什么再执行
+3. **机器可读**：加 `--json` 解析结构化输出
+4. **失败即恢复**：CLI 失败响应会带 `→ Run: <cmd>` 恢复提示，照着跑就行
+
+## 安全规范
+
+- **改配置前必先 `--dry-run`**——配置数据是用户的命脉，预览给用户看是保护他们的安全网
+- **API Key**：用户在对话里明确给了你才写入；没给就引导他去 **设置 → 对应页面** 填，不要追问
+- **删除前确认**：用户说"删了吧"也要回读"我要删的是 X，确认吗"
+
+## 生效时机
+
+- **MCP 工具变更**（增删改 / 启禁用 / 环境变量 / OAuth）：磁盘立即写入，但工具在**下一轮对话**才能调用——MCP server 在 session 创建时绑定。当前轮配完后告诉用户："发条新消息我就能用了"
+- **其他配置**（Provider / Agent / cron / skill / plugin / config）：写入即时生效
+
+---
+
+## 命令速查 + 何时使用
+
+### MCP 工具（mcp）
+
+```bash
+myagents mcp list                                       # 看用户配了哪些 MCP
+myagents mcp show <id>                                  # 看某个 MCP 的完整配置（command/args/env/headers）
+myagents mcp add --id <id> --type <stdio|sse|http> ...  # 新增
+myagents mcp remove <id>                                # 删除
+myagents mcp enable <id> --scope <user|project|both>    # 启用
+myagents mcp disable <id> --scope <user|project|both>   # 禁用
+myagents mcp test <id>                                  # 实际握手测试连通性
+myagents mcp env <id> set KEY=val [KEY2=val2 ...]       # 设环境变量（覆盖）
+myagents mcp env <id> get [KEY ...]                     # 读环境变量
+myagents mcp env <id> delete KEY [KEY2 ...]             # 删环境变量
+myagents mcp oauth discover <id>                        # 探测 MCP server 是否支持 OAuth + 拿到 metadata
+myagents mcp oauth start <id> [--clientId X --clientSecret Y --scopes "..." --callbackPort N]
+                                                        # 启动 OAuth 授权流程（会打开浏览器）
+myagents mcp oauth status <id>                          # 看授权状态（已授权 / token 是否过期）
+myagents mcp oauth revoke <id>                          # 撤销授权
+```
+
+**何时用：**
+- "帮我接个 X 工具" → `mcp add` → `mcp enable --scope both` → `mcp test`
+- "看下 playwright 配的啥" → `mcp show playwright`
+- "Notion MCP 怎么登录" → `mcp oauth discover` 看支持的 scopes，再 `mcp oauth start`
+- "X 工具用不了，是不是登录过期了" → `mcp oauth status <id>`，过期就重跑 `oauth start`
+- "给 fetch 加个 API Key 环境变量" → `mcp env fetch set FETCH_API_KEY=sk-xxx`
+
+### 模型 Provider（model）
+
+```bash
+myagents model list                                     # 看所有 Provider + 验证状态
+myagents model add --id <id> --name <显示名> --base-url <url> --models <m1,m2,...> [其它]
+myagents model remove <id>                              # 删除自定义 Provider（内置的删不掉）
+myagents model set-key <id> <apiKey>                    # 设 API Key
+myagents model set-default <id>                         # 设为默认 Provider
+myagents model verify <id> [--model <某个具体模型>]      # 实际发一条测试消息验证
+```
+
+**何时用：**
+- "帮我配 DeepSeek" → 内置 Provider 直接 `model set-key deepseek <key>` → `model verify`
+- "我要用一个新厂商" → 详见下方 §配置模型服务流程
+- "把默认改成智谱" → `model set-default zhipu`
+- "我之前加的那个废 Provider 删了吧" → `model remove <id>`
+
+### Agent + Channel（agent）
+
+```bash
+myagents agent list                                     # 列出所有 Agent
+myagents agent show <id>                                # 看某 Agent 的 effective 默认（runtime/model/permissionMode）
+myagents agent enable <id>                              # 启用
+myagents agent disable <id>                             # 禁用
+myagents agent set <id> <key> <jsonValue>               # 改单个字段（key/value 形式，value 必须是合法 JSON）
+                                                        # 受保护字段：id / channels（这俩用专用命令）
+myagents agent channel list <agentId>                   # 列出某 Agent 的所有 Channel
+myagents agent channel add <agentId> --type <平台> --<凭证flag> ...
+                                                        # 添加 Channel（平台 = telegram / dingtalk / openclaw:xxx）
+myagents agent channel remove <agentId> <channelId>     # 删除 Channel
+myagents agent runtime-status                           # 看所有 Agent 的实时连接状态（在线/离线/uptime/最近消息）
+```
+
+**何时用：**
+- "我那个 Agent 现在啥配置" → `agent show <id>`，按 runtime 正确解析过 effective 值
+- "把 Agent X 的 model 改成 Y" → `agent set X model '"Y"'`（注意 JSON 字符串要双层引号）
+- "把 permissionMode 改成 plan" → `agent set X permissionMode '"plan"'`
+- "飞书 Bot 在线吗" → `agent runtime-status`（这个看运行时；`agent list` 看的是配置）
+- 配 Channel 详见下方 §配置 Agent Channel 流程
+
+`agent set` 和 `agent show` 互补：show 读 effective 值（含 runtime 分层解析），set 写**单个**字段。复杂 Channel 改动走 `agent channel`，别用 `agent set channels`——会被拒。
+
+### Agent Runtime 发现（runtime）
+
+```bash
+myagents runtime list                                   # 4 个 runtime（builtin/claude-code/codex/gemini）的装机情况 + 版本
+myagents runtime list --json                            # 机读：installed/version/path
+myagents runtime describe <runtime>                     # 某 runtime 的 model 清单 + permissionMode 枚举
+myagents runtime diagnose codex [--workspacePath PATH]  # Codex 的 auth/features/MCP/apps/effective-env 快照（issue #194）
+myagents diagnose runtime codex                         # 同上的 sugar 写法
+```
+
+**何时用：**
+- 在跑 `task create-direct --runtime X --model Y --permissionMode Z` **之前**先 `runtime describe X` 把合法值查清楚——`--help` 只列 flag，值靠这俩命令现场查，不会因为文档漂移而错
+- "我装了哪些 Agent CLI" → `runtime list`
+- 用户问"codex 支持什么 model" → `runtime describe codex`
+- 「@oai/artifact-tool 我从终端能调用、MyAgents 里就不行」/「Codex MCP 在 MyAgents 里看不到」/「Codex 是不是用错代理了」→ `runtime diagnose codex`。它 spawn 一个临时 codex app-server，跑 `getAuthStatus` / `experimentalFeature/list` / `mcpServerStatus/list` / `app/list` 四个 RPC，把 Codex 自己看到的状态原样吐出来，省得猜。effectiveEnv 节里能看到 MyAgents 注入的代理是不是真到了子进程，feature flag 是不是真生效。
+
+每个外部 runtime 有自己的动态 model 清单（Codex/Gemini 会 spawn CLI 查）和自己的 permissionMode 枚举（`suggest` / `auto-edit` / `full-auto` ≠ 内置的 `auto` / `plan` / `fullAgency`）——别混。
+
+### Skills（skill）
+
+```bash
+myagents skill list                                     # 已装 skill（全局 + 项目级）
+myagents skill info <name>                              # 某 skill 的详情
+myagents skill add <url-or-spec> [--scope user|project] [--plugin X] [--skill Y] [--force] [--dry-run]
+myagents skill remove <name>                            # 删除
+myagents skill enable <name>                            # 启用
+myagents skill disable <name>                           # 禁用
+myagents skill sync                                     # 把 ~/.claude/skills 里用户自己装的同步过来
+```
+
+**`skill add` 输入形态**（同一 resolver 全吃）：
+
+| 输入 | 说明 |
+|------|------|
+| `foo/bar` | GitHub owner/repo 简写 |
+| `https://github.com/foo/bar` | 完整 URL |
+| `https://github.com/foo/bar/tree/main/skills/baz` | 子路径，只装 baz |
+| `foo/bar@baz` | 仓库内多 skill 选其一 |
+| `"npx skills add foo/bar --skill baz"` | 用户从 README 复制的整条命令（用引号包） |
+| `https://example.com/x.zip` | 直连 zip/tar.gz |
+
+**不支持**：GitLab、私有仓库、git SSH。
+
+**何时用：**
+- 用户贴 GitHub 链接或 `npx skills add ...` → 直接 `skill add "<原文>"`，resolver 自己剥前缀
+- "装 React 最佳实践" → `skill add vercel-labs/skills --skill react-best-practices`
+- 报错 `该仓库是 Claude Plugins 市场` → 按提示加 `--plugin <name>`，比如 `skill add anthropics/skills --plugin document-skills` 一次装 docx/pdf/pptx/xlsx
+- 报错 `技能 X 已存在` → 跟用户确认要不要 `--force` 覆盖
+- 用户在 `~/.claude/skills/` 自己塞了东西 MyAgents 看不见 → `skill sync`
+
+### 定时任务（cron）
+
+```bash
+myagents cron list                                      # 列出所有定时任务
+myagents cron add --name "..." --prompt "..." --schedule "..." --workspace <abs>
+                                                        # --schedule "0 18 * * *" 标准 cron / --every 15 每 N 分钟
+                                                        # --prompt-file <path> 也行（多行 / 含 backtick 用这个，1MB 上限）
+myagents cron update <taskId> [--name X --prompt X --schedule X --every N --model X --permissionMode X]
+                                                        # 改任意字段，没传的不动
+myagents cron start <taskId>                            # 启动已停止的任务
+myagents cron stop <taskId>                             # 停止运行中的任务
+myagents cron run-now <taskId>                          # 立即手动触发一次（不影响计划）
+myagents cron remove <taskId>                           # 删除
+myagents cron runs <taskId> [--limit N]                 # 看执行历史
+myagents cron status                                    # 概览：总数 / 运行中 / 下次执行
+myagents cron exit [--reason "..."]                     # 仅在 cron 任务自己的 session 内可用，且任务的 Allow AI to exit 必须开
+                                                        # AI 判断"该结束了"时主动退出当前轮
+myagents cron readme                                    # 拉 cron 工具的完整使用文档（progressive disclosure）
+```
+
+**何时用：**
+- "帮我每天 6 点出日报" → `cron add --name "日报" --prompt "..." --schedule "0 18 * * *" --workspace /path`
+- "把日报的 prompt 改一下" → `cron update <taskId> --prompt "新内容"`
+- "立刻跑一次看看" → `cron run-now <taskId>`
+- "停了它别再跑" → `cron stop`（保留配置）；彻底删用 `cron remove`
+- "上次执行成功了吗" → `cron runs <taskId>`
+- `cron exit` / `cron readme` 是 AI 在自己 cron 任务运行中用的——给用户管 cron 用前面那一串
+
+### 任务中心（task / thought）
+
+```bash
+myagents thought list [--tag X --query X --limit N]     # 列想法（用户先记下来、后续派发的轻量条目）
+myagents thought create '...'                           # 记一条想法（首选：单引号包裹防 shell 注入；
+                                                        # 用 #xxx 内联打 tag —— 没有 --tag flag）
+myagents thought create --content "..."                 # 显式 flag 形态，跟单引号等价
+myagents thought create --content-file <abs-path>       # 内容含多行 / CJK / shell 元字符 /
+                                                        # Windows 下单引号失灵时的保底通道
+
+myagents task list [--status X --workspaceId X --tag X --includeDeleted]
+myagents task get <taskId>                              # 详情 + statusHistory + 各 .md 文档路径
+myagents task create-direct --name "..." --workspaceId <id> --workspacePath <abs> \
+    [--taskMdFile <path> | --taskMdContent "..."] \
+    [--runtime X --model X --permissionMode X --runtimeConfig <jsonStr>] \
+    [--executor agent --executionMode once --runMode X --tags x,y --sourceThoughtId X]
+myagents task create-from-alignment <alignmentSessionId> --name "..." [--run] [其它同 create-direct]
+                                                        # 从 AI 对齐会话物化任务（workspaceId/Path/sourceThoughtId 自动继承）
+                                                        # --run 创建后立刻派发，省一步
+myagents task run <taskId>                              # 派发 todo 任务
+myagents task rerun <taskId>                            # 从 blocked/stopped/done 重新派发
+myagents task update-status <taskId> <status> [--message "..."]
+                                                        # 状态机：todo→running→verifying→done（或 →blocked/stopped）、done→archived
+myagents task append-session <taskId> <sessionId>       # 把一个聊天 session 关联到任务（任务过程中开了新会话用这个登记）
+myagents task archive <taskId> [--message "..."]        # 归档（仅用户可操作；AI 走会被拒）
+myagents task delete <taskId>                           # 软删除（30 天保留）
+```
+
+**任务级 runtime/model/permissionMode 覆盖**：`create-direct` / `create-from-alignment` 支持仅对该任务生效的覆盖 flag，**不会改 Agent 工作区默认**。典型场景："实现用 Claude Code、review 用 Codex" → 创两个任务，`--runtime` 不一样，工作区配置不变。
+
+| Flag | 语义 |
+|------|------|
+| `--runtime` | `builtin` / `claude-code` / `codex` / `gemini`，不传则继承 |
+| `--model` | 值取决于 runtime，**先 `runtime describe <runtime>` 查** |
+| `--permissionMode` | 值取决于 runtime，**同样先 `runtime describe`** |
+| `--runtimeConfig` | JSON 对象字符串，runtime 专属配置（罕用） |
+
+**何时用：**
+- "看我还有啥没做完的" → `task list --status running` / `task list`
+- "这个想法派发出去" → `task create-from-alignment <sessionId> --name "..." --run`
+- "创个 review PR 的任务用 codex" → `task create-direct ... --runtime codex --model gpt-5.2 --permissionMode full-auto`
+- "任务过程中我开了个新对话登记一下" → `task append-session <taskId> <sessionId>`
+- "标记完成" → `task update-status <taskId> done --message "..."`
+- "重新跑一遍" → `task rerun <taskId>`
+- 只读类 `task get` / `task list`：CLI 输出会带各 `.md` 文档路径（task.md / verify.md / progress.md / alignment.md），用 Read/Edit/Write 直接读改即可
+
+**验证与恢复**：CLI 在转发给 Rust 前会前置校验 `--runtime` / `--model` / `--permissionMode`，不合法直接拒绝并带 `→ Run: myagents runtime describe <rt>` 指引；输出会打印 `overridesRequested` vs `overridden`，传了 override 但没落到持久化态会明确提示 drift。
+
+### 社区插件（plugin）
+
+```bash
+myagents plugin list                                    # 已装的 OpenClaw 社区插件
+myagents plugin install <npmSpec>                       # 从 npm 安装（如 @anthropic/wechat）
+myagents plugin remove <pluginId>                       # 卸载
+```
+
+**何时用：**
+- "装个微信插件" → `plugin install <npm 包名>`
+- "我哪里能找到飞书插件" → 让用户去 OpenClaw 仓库找 npm 包名，再 install
+
+安装走内置 Node.js 的 npm，可能需要 10-30 秒。卸载前会检查是否有 Channel 还在用这个插件——有的话先把 Channel 移掉。
+
+### Claude 插件（cc-plugin） — PRD 0.2.17
+
+```bash
+myagents cc-plugin list                                 # 已装 Claude 插件 + 启停状态
+myagents cc-plugin install <source>                     # 来源：owner/repo / GitHub URL / 直链 zip / file:///abs
+myagents cc-plugin uninstall <name> [--purgeData]       # 卸载（数据目录默认保留）
+myagents cc-plugin enable <name>                        # 启用（下次 session 生效）
+myagents cc-plugin disable <name>                       # 禁用
+myagents cc-plugin show <id|name>                       # 详情（含 manifest + 组件清单）
+```
+
+**与上面 `plugin` 的区别：** `cc-plugin` 是 Anthropic 官方的 Claude Plugin 协议（自带 skills/agents/MCP/hooks 的目录），落在 `~/.myagents/plugins/<name>/`；启用后由 SDK 自动装载组件。`plugin`（无前缀）则是 OpenClaw 的 IM 渠道插件，两套体系不冲突。
+
+**何时用：**
+- "粘个 GitHub URL 装个插件" → `cc-plugin install owner/repo`
+- "装本地正在调的插件" → `cc-plugin install file:///path/to/plugin`
+- "禁掉 X 插件" → `cc-plugin disable X`
+
+启停 / 安装 / 卸载后会触发 SDK 柔性重启（500ms 防抖），下一次发消息时 plugin 内组件才生效。外部 Runtime（Claude Code CLI / Codex / Gemini）下不读取这里——它们各自管自己的 plugin 体系。
+
+### 通用配置 + 状态（config / status / version / reload）
+
+```bash
+myagents config get <key>                               # 读，支持点号路径如 proxySettings.host
+myagents config set <key> <value> [--dry-run]           # 写，value 是 JSON 字面量（字符串要带引号）
+myagents status                                         # 应用整体运行状态
+myagents version                                        # 应用版本号
+myagents reload [--workspacePath <abs>]                 # 热加载配置（不重启进程）
+```
+
+**何时用：**
+- "现在配的代理是啥" → `config get proxySettings`
+- "把代理 host 改成 X" → `config set proxySettings.host '"X"'`
+- "应用版本" → `version`
+- "改完手动让它生效" → `reload`（多数命令已经自动 broadcast，这个是兜底）
+
+### IM 媒体下发（im）
+
+```bash
+myagents im send-media --file <绝对路径> [--caption "..."]
+                                                        # 仅在 IM Bot / Agent Channel session 内可用
+myagents im readme                                      # 拉 IM 工具完整文档
+```
+
+**何时用：**
+- 你正在某个 IM 渠道（Telegram / 飞书 / 钉钉 / OpenClaw）的会话里跟用户聊，要发图片 / 视频 / 文件给对方时用 `im send-media`
+- `--file` 必须是绝对路径，且路径白名单：必须落在 workspace / `/tmp` / MyAgents scratch 目录之一——这是为了防 prompt injection 把 `~/.ssh/id_rsa` 之类发给聊天对方
+- 不在 IM session 内调用会返回 "No IM context"，正常——这命令本来就是 session-scoped
+
+### Session 间通信（session, PRD 0.2.18）
+
+```bash
+# 默认: 投出去 + 期待对方回应推回来(会作为 <inbox-reply> 出现在你的下一个 turn)
+myagents session send <sessionId> -p "<prompt>"
+myagents session send <sessionId> --prompt-file <abs-path>   # 多行/长文本(>4KB)必用,跨平台稳定
+
+# 仅通知:对方处理后输出走它自己的呈现路径,不推回给你
+myagents session send <sessionId> -p "<prompt>" --no-reply
+myagents session send --help                                 # 完整用法 / EXIT CODES / 示例
+```
+
+**何时用:**
+- 你收到了来自其它 session 的消息(`<inbox-message from="...">`)或 cron 推送(`<cron-task ...>` 含 sessionId),用户希望你向那个 session **反馈、追问、澄清或下指令**
+- 用户在对话里直接给了你一个 sessionId,让你与其交互
+- **不要用**于答复当前用户(直接回复就行);不要用于给 IM peer 发消息(用 `im send-media`)
+- AI 身份(from label)系统会自动从你所在 session 元数据推导——你不需要也不应该手动指定
+
+**异步语义(关键):**
+- CLI 立即返回投递结果,**不等待**对方处理
+- 默认期待 reply 推回:对方处理完后,你将在新 turn 收到 `<inbox-reply from="..." in_reply_to="...">` 前缀消息
+- `--no-reply`:仅通知,reply 不回流(对方按自己呈现路径输出)
+- target session idle/dead 不影响投递——系统会自动唤起
+
+**Windows 安全:**
+- `-p` 内容含 `\n` 或 > 4KB → CLI 立即 fail-fast(exit 3),提示切到 `--prompt-file`
+- 习惯上长 / 多行内容**永远**走 `--prompt-file`,跨平台一致
+
+### Generative UI Widget 设计文档（widget）
+
+```bash
+myagents widget readme                                  # 看有哪些 widget 模块（chart/diagram/interactive/dashboard/art）
+myagents widget readme <module1> [<module2> ...]        # 拉具体模块的完整设计规范
+```
+
+**何时用：**
+- 用户让你"做个图表 / 仪表盘 / SVG 流程图"前，先 `widget readme <module>` 拉对应模块的完整规范（含输出格式契约、palette、组件库），**不要凭印象写**
+- 模块清单：`chart`（Chart.js 图表）/ `diagram`（SVG 流程图）/ `interactive`（滑块/计算器/对比卡）/ `dashboard`（多图表 + 控件）/ `art`（SVG 插画）
+- 渲染输出有严格 `<generative-ui-widget>` 格式契约——readme 开头会说明，跳读会出错
+
+`cron readme` / `im readme` / `widget readme` 都是 progressive disclosure：brief 已经在系统 prompt 里，要用时才 fetch full doc。
+
+---
+
+## 典型工作流
+
+### 接入 MCP 工具
+
+1. 从用户给的文档提取：server ID、类型（stdio/sse/http）、command 或 URL、所需环境变量
+2. `myagents mcp add --dry-run ...` 预览
+3. 给用户看预览，确认
+4. 执行：`mcp add` → `mcp enable --scope both` → 配 env（如需）→ 如果是 OAuth 类的再 `mcp oauth start`
+5. `myagents mcp test <id>` 实际握手测试
+6. `myagents reload`
+7. 告诉用户："发条新消息我就能用了"
+
+### 配置模型服务（最常见、最有价值）
+
+#### 协议优先级：Anthropic 协议永远先于 OpenAI 兼容
+
+MyAgents 基于 Claude Agent SDK，原生协议是 Anthropic Messages API。接入第三方 API 时：
+
+1. **Anthropic 协议（最优先）**：原生协议，零转换开销，所有 SDK 能力（工具调用 / 流式 / Extended Thinking）都正常
+2. **OpenAI 兼容（兜底）**：服务商只给 `/v1/chat/completions` 时用 `--protocol openai`，过协议桥接层转换，部分高级功能受限
+
+#### 从文档提取配置
+
+**第一步：找 Anthropic / Claude Code 接入板块（优先）**
+
+大多数支持 Anthropic 协议的服务商，会在文档里以「接入 Claude Code」的形式呈现——MyAgents 和 Claude Code 共享 SDK，所以 Claude Code 的接入方式就是我们最原生的接入方式。
+
+文档里搜：`Claude Code` / `Anthropic` / `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` / `/anthropic`。
+
+提取：
+- `ANTHROPIC_BASE_URL` → `--base-url`
+- 认证方式（Bearer Token vs API Key）→ `--auth-type`
+- 模型名称列表 → `--models`
+
+**即使文档同时给了 OpenAI 兼容方式，只要有 Anthropic 方式就用 Anthropic。**
+
+**第二步：实在没 Anthropic 才用 OpenAI 兼容**
+
+搜：`OpenAI 兼容` / `/v1/chat/completions` / `chat completions`。
+
+- API base → `--base-url`（通常 `/v1` 结尾或去掉 `/chat/completions`）
+- 加 `--protocol openai`
+- `--upstream-format`：多数 `chat_completions`（默认），少数新服务商支持 `responses`
+
+#### Claude Code 环境变量 → CLI flag 映射
+
+| Claude Code 环境变量 | MyAgents CLI |
+|---------------------|------------|
+| `ANTHROPIC_BASE_URL` | `--base-url` |
+| `ANTHROPIC_API_KEY` | `model set-key` 设置 |
+| `ANTHROPIC_AUTH_TOKEN` | 同上，区别在 `--auth-type` |
+
+**`--auth-type` 选择**：
+- 文档说设 `ANTHROPIC_AUTH_TOKEN` → `auth_token`
+- 文档说设 `ANTHROPIC_API_KEY` → `api_key`
+- 两个都设 / 没说清 → `both`（默认，最安全）
+- OpenRouter 等特殊服务商 → `auth_token_clear_api_key`
+
+#### model add 完整 flag
+
+```
+myagents model add \
+  --id <唯一ID>              # 必填
+  --name <显示名>             # 必填
+  --base-url <API地址>        # 必填
+  --models <模型ID列表>       # 必填，逗号分隔或多次 --models
+  --model-names <显示名列表>   # 可选，与 models 一一对应
+  --model-series <系列名>      # 可选，默认取 provider ID
+  --primary-model <默认模型>   # 可选，默认取第一个 model
+  --auth-type <认证类型>       # 可选，默认 auth_token
+  --protocol <协议>           # 可选，anthropic(默认) 或 openai
+  --upstream-format <格式>     # 可选（仅 openai），chat_completions(默认) 或 responses
+  --max-output-tokens <数字>   # 可选（仅 openai），默认 8192
+  --vendor <供应商名>          # 可选，默认取 name
+  --website-url <官网>         # 可选
+  --dry-run
+```
+
+#### 免费模型优先策略
+
+很多 Provider 同时提供付费模型和免费模型。`model verify` 会用 `primaryModel` 发一条测试消息——如果用户还没充值，验付费模型会失败。
+
+**策略**：Provider 既有免费也有付费时，把免费模型放在 `--models` 列表第一位，`primaryModel` 自动选中免费模型，验证更易过。**例外**：用户明确说要哪个就用哪个。
+
+#### 完整流程
+
+1. `model list` 看是不是已有内置 Provider
+2. 是内置 → 直接 `model set-key`
+3. 要新增 → `model add --dry-run ...` 预览
+4. 给用户看预览，确认
+5. `model add ...` 正式加
+6. `model set-key <id> <key>`
+7. `model verify <id>`
+8. 验证失败按报错排查：
+   - 认证失败 → 检查 Key 和 `--auth-type`
+   - 模型不存在 → 检查模型名称
+   - 余额不足 → 切到免费模型验证
+   - 协议不对 → `--protocol` 在 anthropic / openai 之间切
+9. 视情况 `model set-default <id>`
+
+### 配置 Agent Channel
+
+```bash
+myagents agent channel list <agentId>                                       # 看现有
+myagents agent channel add <agentId> --type telegram --bot-token <token>
+myagents agent channel add <agentId> --type feishu --feishu-app-id <id> --feishu-app-secret <secret>
+myagents agent channel add <agentId> --type dingtalk --dingtalk-client-id <id> --dingtalk-client-secret <secret>
+myagents agent channel remove <agentId> <channelId>
+```
+
+不同平台需要不同凭证（flag 名必须与配置字段一致）。OpenClaw 社区插件（如飞书 `openclaw-lark`、微信）的 `--type` 是 `openclaw:<pluginId>`，并需要先 `plugin install` 装好对应插件。
