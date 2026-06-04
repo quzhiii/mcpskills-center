@@ -1,0 +1,7 @@
+{
+  "name": "lark-office",
+  "description": "Office automation profile for Feishu/Lark and document production.",
+  "agents": ["claude-code"],
+  "mcpServers": ["zread", "fetcher"],
+  "skills": ["doc-coauthoring", "document-release", "pdf", "pptx", "xlsx"]
+}

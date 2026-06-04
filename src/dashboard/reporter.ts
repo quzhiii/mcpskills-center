@@ -1,5 +1,6 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { renderDashboardHtml } from './html.js';
 import type { Inventory, AuditReport } from '../types/index.js';
 
 export async function writeInventoryJson(inventory: Inventory, outPath: string): Promise<void> {
@@ -104,8 +105,30 @@ export async function writeAuditMarkdown(report: AuditReport, outPath: string): 
     lines.push('');
   }
 
+  // Recommendations
+  lines.push('## Recommendations');
+  lines.push('');
+  if (report.recommendations.length > 0) {
+    lines.push('| Category | Target | Severity | Requires Write | Action |');
+    lines.push('|----------|--------|----------|----------------|--------|');
+    for (const recommendation of report.recommendations) {
+      const target = `${recommendation.targetType}: ${recommendation.targetId}`;
+      lines.push(
+        `| ${escapeMarkdownTableCell(recommendation.category)} | ${escapeMarkdownTableCell(target)} | ${escapeMarkdownTableCell(recommendation.severity)} | ${recommendation.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(recommendation.suggestedAction)} |`
+      );
+    }
+    lines.push('');
+  } else {
+    lines.push('No recommendations.');
+    lines.push('');
+  }
+
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, lines.join('\n'), 'utf-8');
+}
+
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
 export async function writeAllReports(inventory: Inventory, audit: AuditReport, baseDir: string): Promise<void> {
@@ -113,5 +136,11 @@ export async function writeAllReports(inventory: Inventory, audit: AuditReport, 
     writeInventoryJson(inventory, join(baseDir, 'inventory-current.json')),
     writeInventoryMarkdown(inventory, join(baseDir, 'inventory-current.md')),
     writeAuditMarkdown(audit, join(baseDir, 'audit-current.md')),
+    writeDashboardHtml(inventory, audit, join(baseDir, 'dashboard.html')),
   ]);
+}
+
+export async function writeDashboardHtml(inventory: Inventory, audit: AuditReport, outPath: string): Promise<void> {
+  await mkdir(dirname(outPath), { recursive: true });
+  await writeFile(outPath, renderDashboardHtml(inventory, audit), 'utf-8');
 }

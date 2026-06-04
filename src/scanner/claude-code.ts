@@ -1,6 +1,7 @@
 import { readdir, readFile, stat, lstat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
+import { parseJsonConfig } from '../config/parse.js';
 import type { Skill, MCPServer } from '../types/index.js';
 
 export class ClaudeCodeScanner extends BaseScanner {
@@ -65,24 +66,55 @@ export class ClaudeCodeScanner extends BaseScanner {
 
     try {
       const content = await readFile(mcpFile, 'utf-8');
-      const config = JSON.parse(content);
-      const mcpServers = config.mcpServers || {};
+      const config = parseJsonConfig<Record<string, any>>(content);
 
-      for (const [name, serverConfig] of Object.entries(mcpServers)) {
-        const cfg = serverConfig as Record<string, unknown>;
-        const command = typeof cfg.command === 'string' ? cfg.command : undefined;
-        const transport = this.detectTransport(cfg);
+      // Handle multi-project structure in .claude.json
+      const projects = config.projects || {};
 
-        servers.push({
-          id: name,
-          agentSources: [this.agentConfig.name],
-          transport,
-          command,
-          isDuplicate: false,
-          isEnabled: true,
-          canStart: null,
-          hasSensitiveEnv: this.checkSensitiveEnv(cfg),
-        });
+      for (const [projectId, projectConfig] of Object.entries(projects)) {
+        const pcfg = projectConfig as Record<string, any>;
+        const mcpServers = pcfg.mcpServers || {};
+
+        for (const [name, serverConfig] of Object.entries(mcpServers)) {
+          const cfg = serverConfig as Record<string, unknown>;
+          const command = typeof cfg.command === 'string' ? cfg.command : undefined;
+          const host = typeof cfg.url === 'string' ? cfg.url : undefined;
+          const transport = this.detectTransport(cfg);
+
+          servers.push({
+            id: `${projectId}:${name}`,
+            agentSources: [this.agentConfig.name],
+            transport,
+            command,
+            host,
+            isDuplicate: false,
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: this.checkSensitiveEnv(cfg),
+          });
+        }
+      }
+
+      // Also handle global mcpServers if any (though unlikely for Claude Code now)
+      if (config.mcpServers) {
+        for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+          const cfg = serverConfig as Record<string, unknown>;
+          const command = typeof cfg.command === 'string' ? cfg.command : undefined;
+          const host = typeof cfg.url === 'string' ? cfg.url : undefined;
+          const transport = this.detectTransport(cfg);
+
+          servers.push({
+            id: `global:${name}`,
+            agentSources: [this.agentConfig.name],
+            transport,
+            command,
+            host,
+            isDuplicate: false,
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: this.checkSensitiveEnv(cfg),
+          });
+        }
       }
     } catch (err) {
       console.warn(`Warning: Could not read Claude Code MCP config: ${mcpFile}`, (err as Error).message);
