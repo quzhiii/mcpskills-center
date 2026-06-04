@@ -1,155 +1,231 @@
 # MCPskills Center
 
-Local-first CLI for managing MCP servers and agent skills across Claude Code, OpenCode, and Codex.
+<div align="center">
 
-The project turns scattered local agent configuration into a readable inventory, audit report, dry-run sync plan, profile plan, health report, and static dashboard. It is designed for this machine first, not SaaS.
+**Local-first CLI for scanning, auditing, planning, and synchronizing MCP servers and agent skills across Claude Code, OpenCode, and Codex.**
 
-## Current Capabilities
+[![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Mode](https://img.shields.io/badge/mode-local--first-6f42c1)](#safety-model)
+[![Default](https://img.shields.io/badge/default-read--only-success)](#safety-model)
+[![Outputs](https://img.shields.io/badge/output-HTML%20%7C%20JSON%20%7C%20Markdown-lightgrey)](#outputs)
 
-- Scan Claude Code, OpenCode, and Codex skills/MCP config.
-- Parse JSON, UTF-8 BOM JSON, and Codex TOML config.
-- Generate inventory and audit reports.
-- Generate actionable audit recommendations.
-- Generate canonical skill sync dry-run plans.
-- Apply sync write actions with explicit confirmation and backup manifests.
-- Restore prior sync writes from a backup manifest.
-- Load local MCP/skill profiles from `config/profiles/*.json`.
-- Generate profile plans without writing config.
-- Run passive MCP health checks by default.
-- Run explicit active MCP command probes with allowlist and timeout.
-- Generate an offline static dashboard at `reports/dashboard.html`.
+[中文文档](README.zh-CN.md) · **English**
 
-## Install
+[Quickstart](#quickstart) · [Outputs](#outputs) · [Commands](#commands) · [Scenarios](#scenarios) · [Profiles](#profiles) · [Safety](#safety-model) · [Boundaries](#boundaries)
+
+</div>
+
+---
+
+## What Is This?
+
+MCPskills Center gives one local machine a clear control surface for agent capabilities that are usually scattered across multiple tools.
+
+It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run sync plans, checks health status, and renders readable reports for review.
+
+```text
+Claude Code config ─┐
+OpenCode config ────┼─→ scan → audit → plan → verify → report
+Codex config ───────┘                      │
+                                           ├─→ sync dry-run
+                                           ├─→ sync apply with backup manifest
+                                           ├─→ restore from manifest
+                                           └─→ offline dashboard.html
+```
+
+The current release focuses on a practical local workflow:
+
+| Capability | What it gives you |
+|---|---|
+| Inventory scanning | Unified view of MCP servers, skills, install paths, metadata, and issues |
+| Audit reporting | Duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, sensitive env key risk |
+| Sync planning | Canonical skill distribution plan with dry-run output before any writes |
+| Safe apply / restore | Explicit `--confirm`, approved-root checks, timestamped backups, restore manifests |
+| Profiles | Read-only planning for scenario-based capability bundles such as `coding` or `research` |
+| Health checks | Passive validation by default, explicit active command probing when allowlisted |
+| Dashboard | Static offline HTML report at `reports/dashboard.html` |
+
+---
+
+## Quickstart
+
+Clone the repository, install dependencies, run the test suite, then generate the first inventory snapshot.
 
 ```bash
+git clone https://github.com/quzhiii/mcpskills-center.git
+cd mcpskills-center
+
 npm install
-```
-
-## Verify
-
-```bash
-npm run build
 npm test
-npm audit --audit-level=moderate
-```
-
-## Commands
-
-### Scan
-
-```bash
 npm run scan
 ```
 
-Equivalent:
+Expected result:
+
+- TypeScript builds successfully into `dist/`.
+- Tests pass.
+- Generated reports appear under `reports/`.
+- `reports/dashboard.html` opens locally without external assets.
+
+If you want a quick read-only sync plan next:
 
 ```bash
-node dist/index.js scan
+node dist/index.js sync --dry-run
 ```
 
-Writes generated reports to `reports/`:
+---
+
+## Outputs
+
+### Main report set
+
+`scan` writes:
 
 - `reports/inventory-current.json`
 - `reports/inventory-current.md`
 - `reports/audit-current.md`
 - `reports/dashboard.html`
 
-### Audit
+`sync --dry-run` writes:
+
+- `reports/sync-plan-current.json`
+- `reports/sync-plan-current.md`
+
+`sync --apply --confirm` writes timestamped backup content under `backups/` and a consolidated manifest for the apply run.
+
+### Dashboard preview
+
+The static dashboard summarizes the current state in one offline HTML file:
+
+```text
+Summary cards     Recommendations table     Skills table     Issues table
+     │                     │                    │                │
+     └───────────── all generated from the current local inventory ─────────────┘
+```
+
+Generated HTML is a reading surface. The JSON and Markdown reports remain the auditable artifacts for automation and review.
+
+---
+
+## Commands
+
+| Command | Purpose | Writes |
+|---|---|---|
+| `npm run scan` | Scan inventory, normalize records, audit findings, generate reports | `reports/` |
+| `npm run audit` | Print audit summary in the terminal | None |
+| `node dist/index.js sync --dry-run` | Generate a sync plan without changing agent config | `reports/` |
+| `node dist/index.js sync --apply --confirm` | Apply the current sync plan with backups | `backups/` |
+| `node dist/index.js sync --restore <manifest>` | Restore a previous apply run from its manifest | Existing targets |
+| `node dist/index.js profile list` | List available local profiles | None |
+| `node dist/index.js profile show <name>` | Print one profile JSON | None |
+| `node dist/index.js profile plan <name>` | Compare a profile against the current inventory | None |
+| `node dist/index.js health` | Run passive MCP health checks | None |
+| `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | Run explicit active command probes for allowlisted commands | None |
+| `node dist/index.js help` | Show CLI help | None |
+
+---
+
+## Scenarios
+
+### 1. Inspect the current machine state
+
+```bash
+npm run scan
+```
+
+Use this when you want the baseline inventory, audit report, and offline dashboard in one pass.
+
+### 2. Review duplicates and risky entries in the terminal
 
 ```bash
 npm run audit
 ```
 
-Prints a console summary of duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, and sensitive env key risk.
+Use this when you want a quick summary of duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, and sensitive env key risk.
 
-### Sync Dry-Run
+### 3. Plan a canonical skill sync without writing anything
 
 ```bash
 node dist/index.js sync --dry-run
 ```
 
-Optional canonical directory:
+Optional custom canonical directory:
 
 ```bash
-node dist/index.js sync --dry-run --canonical-dir E:\path\to\canonical-skills
+node dist/index.js sync --dry-run --canonical-dir C:\path\to\canonical-skills
 ```
 
-Writes generated sync plan reports:
+The current planner uses a canonical store plus distribution actions to agent skill roots. Review the generated sync plan before any apply step.
 
-- `reports/sync-plan-current.json`
-- `reports/sync-plan-current.md`
+If you later run `sync --apply` with a custom canonical directory, add that directory to `config/sync.json` under `approvedSyncRoots` first. Apply validates both source and target paths.
 
-Dry-run mode does not write to agent config or skill directories. Use the separate apply/restore commands below for explicit write operations.
-
-### Sync Apply
-
-Apply the current sync plan only after explicit confirmation:
+### 4. Apply the current sync plan with backups
 
 ```bash
 node dist/index.js sync --apply --confirm
 ```
 
-Optional canonical directory:
+Apply mode recomputes the current plan, backs up existing targets when present, and writes one manifest that can be used for restore.
+
+### 5. Restore a previous apply run
 
 ```bash
-node dist/index.js sync --apply --confirm --canonical-dir E:\path\to\canonical-skills
+node dist/index.js sync --restore C:\path\to\manifest.json
 ```
 
-Apply mode:
+Restore mode copies backed-up content from the manifest back to the original target path after approved-root validation.
 
-- Recomputes the sync plan from the current inventory.
-- Applies only write actions from that plan.
-- Backs up each existing target before overwrite.
-- Writes one consolidated backup manifest under `backups/` for the apply run.
-
-Safeguards:
-
-- `--confirm` is required.
-- Only roots listed in `config/sync.json` under `approvedSyncRoots` are writable.
-- New targets are created without backup because no previous target exists.
-
-### Sync Restore
-
-Restore a prior sync apply from its manifest:
-
-```bash
-node dist/index.js sync --restore E:\path\to\manifest.json
-```
-
-Restore mode copies each backed-up directory from the manifest back to its original target path.
-
-### Profiles
-
-List profiles:
-
-```bash
-node dist/index.js profile list
-```
-
-Show one profile:
-
-```bash
-node dist/index.js profile show coding
-```
-
-Plan one profile against current inventory:
+### 6. Plan a profile for a focused workflow
 
 ```bash
 node dist/index.js profile plan coding
 ```
 
-Profile files live in `config/profiles/`:
+This reports `already-present`, `missing`, and `disable` actions for the named profile without changing any live config.
 
-- `coding.json`
-- `research.json`
-- `lark-office.json`
-- `security.json`
+### 7. Run safe passive MCP health checks
 
-Profile planning is read-only. It reports `already-present`, `missing`, and `disable` actions without changing any agent config.
+```bash
+node dist/index.js health
+```
 
-### Sync Config
+Passive mode checks transport shape, command presence, URL validity, and sensitive env key risk without spawning commands.
 
-Sync write approvals live in `config/sync.json`:
+### 8. Run explicit active command probes
+
+```bash
+node dist/index.js health --active --allow-command npx --timeout 3000
+```
+
+Active mode only probes allowlisted commands with `--version`, uses argument arrays instead of shell strings, and times out when the command does not return.
+
+---
+
+## Profiles
+
+Sample profiles live in `config/profiles/` and are evaluated read-only against the current inventory.
+
+| Profile | Purpose | Agents |
+|---|---|---|
+| `coding` | Core development workflow with testing and debugging support | `claude-code`, `opencode`, `codex` |
+| `research` | Investigation and web-reading workflow | `claude-code`, `opencode` |
+| `lark-office` | Feishu/Lark and document-production workflow | `claude-code` |
+| `security` | Defensive review and security-audit workflow | `claude-code` |
+
+Example:
+
+```bash
+node dist/index.js profile list
+node dist/index.js profile show coding
+node dist/index.js profile plan coding
+```
+
+---
+
+## Sync Approval Config
+
+Writable sync roots are controlled by `config/sync.json`.
 
 ```json
 {
@@ -162,77 +238,91 @@ Sync write approvals live in `config/sync.json`:
 }
 ```
 
-If this file is missing, the CLI falls back to the same conservative defaults. Invalid values fail before apply runs.
+Relative paths are resolved from the project root. Invalid values fail before an apply run begins.
 
-### Health Checks
-
-Passive checks, default and safe:
-
-```bash
-node dist/index.js health
-```
-
-Passive mode does not spawn commands. It checks transport, URL presence/shape, command presence, and sensitive env key risk.
-
-Active checks, explicit only:
-
-```bash
-node dist/index.js health --active --allow-command npx --timeout 3000
-```
-
-Active mode only probes allowlisted commands with `--version`, uses `spawn(command, args, { shell: false })`, and times out. Non-allowlisted commands are refused.
-
-### Help
-
-```bash
-node dist/index.js help
-```
+---
 
 ## Safety Model
 
 - Default behavior is read-only or dry-run.
-- Sync writes require explicit `--apply --confirm`.
-- Sync restore requires an explicit manifest path.
-- No command writes to agent config by default.
-- Generated reports do not print secret values.
-- Sensitive env detection reports key risk only.
-- Active health checks require `--active` and explicit command allowlist.
-- Active health checks use args arrays, not shell strings.
-- Sync apply only writes to roots approved in `config/sync.json`.
-- Sync apply backs up existing targets before overwrite and writes a restore manifest.
-- Generated reports are ignored by git.
+- `sync --apply` requires explicit `--confirm`.
+- `sync --restore` requires an explicit manifest path.
+- Apply and restore only operate inside approved roots.
+- Existing targets are backed up before overwrite when a previous target exists.
+- Generated reports never print secret values.
+- Sensitive env handling only reports key-risk presence.
+- Passive health checks do not spawn commands.
+- Active health checks require `--active`.
+- Active probes only succeed for commands explicitly allowlisted with `--allow-command`.
+- `--timeout` is optional and defaults to `3000` ms when omitted.
+- Active health probes run `spawn(command, ['--version'], { shell: false })` semantics rather than shell strings.
 
-## Generated Files
+---
 
-Ignored generated outputs:
+## Repository Layout
 
-- `dist/`
-- `reports/*.json`
-- `reports/*.md`
-- `reports/*.html`
-- `node_modules/`
+```text
+mcpskills-center/
+├── config/
+│   ├── profiles/
+│   └── sync.json
+├── docs/
+├── fixtures/
+├── reports/
+├── backups/
+├── src/
+├── README.md
+└── README.zh-CN.md
+```
 
-## Fixture Policy
+Fixture policy:
 
-- `.claude/` is treated as local machine configuration and ignored by git.
+- `.claude/` is treated as local machine configuration and is not tracked as live repository payload.
 - Repository-tracked skill samples live under `fixtures/skills/`.
-- Those fixtures are synthetic and minimal; they are not copies of the user's live installed skills.
+- Those fixtures are synthetic and intentionally minimal.
 
-## Current Limitations
+---
 
-- Approved sync roots are user-configurable in `config/sync.json`; the current sample is machine-specific.
-- Profile planning matches short MCP ids such as `playwright` against project-scoped inventory ids such as `C:/Users/quzhi:playwright`.
-- Passive HTTP/SSE health checks validate scanner-preserved URL/host values when they are present in agent config.
-- The repository keeps only synthetic fixture skills; live local `.claude/` content is not versioned.
+## Boundaries
+
+- The current sample `config/sync.json` is machine-oriented and may need adjustment on another system.
+- Profile matching supports short MCP ids such as `playwright` against project-scoped ids such as `C:/Users/quzhi:playwright`.
+- Passive HTTP and SSE health checks validate preserved URL or host values when present in config.
+- Active health checks validate command reachability through `--version`; they do not perform a full MCP handshake.
+- OpenCode array-form commands are normalized to the leading executable name for health probing.
 - There is no packaged binary yet; use `node dist/index.js ...` after build.
 
-## Project Docs
+---
 
-- `docs/MCPskills-center-background-and-plan.md`
-- `docs/migration-notes.md`
-- `docs/plans/2026-06-03-mcpskills-center-completion.md`
+## Documentation
 
-## Recommended Next Work
+| Document | Purpose |
+|---|---|
+| `docs/MCPskills-center-background-and-plan.md` | Product background, machine context, and original project framing |
+| `docs/migration-notes.md` | Migration decisions and retained / excluded assets |
+| `docs/plans/2026-06-03-mcpskills-center-completion.md` | Implementation plan for the completed CLI workflow |
 
-1. Consider a portable template for `config/sync.json` if this becomes multi-machine.
-2. Expand synthetic fixtures only when a new test needs a stable on-disk example.
+---
+
+## Verify Locally
+
+```bash
+npm run build
+npm test
+npm audit --audit-level=moderate
+```
+
+For a workflow smoke check after the test suite:
+
+```bash
+npm run scan
+npm run audit
+node dist/index.js sync --dry-run
+node dist/index.js health
+```
+
+---
+
+## License
+
+MIT
