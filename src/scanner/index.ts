@@ -34,7 +34,7 @@ export async function runInventory(agents: AgentConfig[] = DEFAULT_AGENTS): Prom
 
   for (const agent of agents) {
     let scanner;
-    switch (agent.name) {
+    switch (agent.scannerType ?? agent.name) {
       case 'claude-code':
         scanner = new ClaudeCodeScanner(agent);
         break;

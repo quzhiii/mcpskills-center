@@ -1,9 +1,19 @@
 export interface AgentConfig {
   name: string;
+  id?: string;
+  displayName?: string;
+  vendor?: string;
+  scannerType?: string;
+  enabled?: boolean;
+  readOnly?: boolean;
   configDir: string;
   skillsDir: string;
   mcpConfigFile?: string;
   pluginsDir?: string;
+}
+
+export interface AgentRegistry {
+  agents: AgentConfig[];
 }
 
 export interface Skill {

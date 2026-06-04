@@ -15,6 +15,7 @@ export interface CommandContext {
   backupsDir: string;
   profilesDir: string;
   syncConfigPath: string;
+  agentConfigPath: string;
   approvedSyncRoots: string[];
   runInventory: () => Promise<Inventory>;
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
@@ -201,13 +202,14 @@ function findProfile<T extends { name: string }>(profiles: T[], name: string | u
   return profile;
 }
 
-export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'approvedSyncRoots'> {
+export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
   return {
     reportsDir: join(dirname, '..', 'reports'),
     canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
     backupsDir: join(dirname, '..', 'backups'),
     profilesDir: join(dirname, '..', 'config', 'profiles'),
     syncConfigPath: join(dirname, '..', 'config', 'sync.json'),
+    agentConfigPath: join(dirname, '..', 'config', 'agents.json'),
     approvedSyncRoots: [
       join(dirname, '..', 'config', 'canonical-skills'),
       'C:/Users/quzhi/.claude/skills',

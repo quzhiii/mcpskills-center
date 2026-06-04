@@ -68,6 +68,7 @@ test('sync apply and restore simulate safely in an isolated CLI environment', as
     backupsDir,
     profilesDir,
     syncConfigPath: join(root, 'config', 'sync.json'),
+    agentConfigPath: join(root, 'config', 'agents.json'),
     approvedSyncRoots: [canonicalRoot, agentOneSkillsDir, agentTwoSkillsDir],
     runInventory: async () => inventory,
     writeAllReports: async () => undefined,
