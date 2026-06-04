@@ -1,0 +1,7 @@
+{
+  "name": "research",
+  "description": "Research and web-reading profile for investigation workflows.",
+  "agents": ["claude-code", "opencode"],
+  "mcpServers": ["web-search-prime", "web-reader", "x-reader", "tavily"],
+  "skills": ["research-superpower", "browse", "web-access"]
+}

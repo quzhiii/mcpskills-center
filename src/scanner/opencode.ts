@@ -1,6 +1,7 @@
 import { readdir, readFile, stat, lstat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
+import { parseJsonConfig } from '../config/parse.js';
 import type { Skill, MCPServer } from '../types/index.js';
 
 export class OpenCodeScanner extends BaseScanner {
@@ -67,12 +68,13 @@ export class OpenCodeScanner extends BaseScanner {
 
     try {
       const content = await readFile(mcpFile, 'utf-8');
-      const config = JSON.parse(content);
-      const mcpServers = config.mcpServers || {};
+      const config = parseJsonConfig<Record<string, any>>(content);
+      const mcpServers = config.mcp || {};
 
       for (const [name, serverConfig] of Object.entries(mcpServers)) {
         const cfg = serverConfig as Record<string, unknown>;
-        const command = typeof cfg.command === 'string' ? cfg.command : undefined;
+        const command = this.extractCommand(cfg);
+        const host = typeof cfg.url === 'string' ? cfg.url : undefined;
         const transport = this.detectTransport(cfg);
 
         servers.push({
@@ -80,6 +82,7 @@ export class OpenCodeScanner extends BaseScanner {
           agentSources: [this.agentConfig.name],
           transport,
           command,
+          host,
           isDuplicate: false,
           isEnabled: true,
           canStart: null,
@@ -109,6 +112,18 @@ export class OpenCodeScanner extends BaseScanner {
       return 'http';
     }
     return 'unknown';
+  }
+
+  private extractCommand(cfg: Record<string, unknown>): string | undefined {
+    if (typeof cfg.command === 'string') {
+      return cfg.command;
+    }
+
+    if (Array.isArray(cfg.command) && typeof cfg.command[0] === 'string') {
+      return cfg.command[0];
+    }
+
+    return undefined;
   }
 
   private checkSensitiveEnv(cfg: Record<string, unknown>): boolean {

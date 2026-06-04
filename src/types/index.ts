@@ -34,8 +34,10 @@ export interface MCPServer {
 export interface Profile {
   name: string;
   description: string;
+  agents: string[];
   mcpServers: string[];
   skills: string[];
+  disabledMcpServers?: string[];
 }
 
 export interface Inventory {
@@ -55,10 +57,21 @@ export interface AuditIssue {
   suggestion: string;
 }
 
+export interface AuditRecommendation {
+  category: 'keep' | 'merge' | 'remove' | 'manual-review';
+  targetType: 'skill' | 'mcp-server';
+  targetId: string;
+  severity: 'error' | 'warning' | 'info';
+  reason: string;
+  suggestedAction: string;
+  requiresWrite: boolean;
+}
+
 export interface AuditReport {
   generatedAt: string;
   inventory: Inventory;
   issues: AuditIssue[];
+  recommendations: AuditRecommendation[];
   summary: {
     totalSkills: number;
     totalMcpServers: number;
@@ -68,4 +81,49 @@ export interface AuditReport {
     brokenSymlinks: number;
     sensitiveEnvs: number;
   };
+}
+
+export interface SyncPlan {
+  generatedAt: string;
+  canonicalSkillsDir: string;
+  strategy: 'symlink' | 'copy';
+  actions: SyncAction[];
+}
+
+export interface SyncAction {
+  id: string;
+  type: 'copy-to-canonical' | 'link-to-agent' | 'copy-to-agent' | 'skip' | 'manual-review';
+  skillId: string;
+  agentName?: string;
+  sourcePath?: string;
+  targetPath?: string;
+  reason: string;
+  requiresWrite: boolean;
+}
+
+export interface SyncBackupManifest {
+  generatedAt: string;
+  entries: SyncBackupEntry[];
+}
+
+export interface SyncBackupEntry {
+  actionId: string;
+  targetPath: string;
+  backupPath: string;
+  capturedAt: string;
+}
+
+export interface ProfilePlan {
+  generatedAt: string;
+  profileName: string;
+  actions: ProfilePlanAction[];
+}
+
+export interface ProfilePlanAction {
+  id: string;
+  type: 'enable' | 'disable' | 'missing' | 'already-present';
+  targetType: 'skill' | 'mcp-server';
+  targetId: string;
+  reason: string;
+  requiresWrite: boolean;
 }

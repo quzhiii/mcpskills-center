@@ -4,9 +4,16 @@ node_modules/
 # Build output
 dist/
 
+# Local git worktrees
+.worktrees/
+
+# Local Claude configuration
+.claude/
+
 # Reports (generated)
 reports/*.json
 reports/*.md
+reports/*.html
 
 # IDE
 .vscode/

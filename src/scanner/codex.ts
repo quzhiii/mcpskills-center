@@ -1,6 +1,7 @@
 import { readdir, readFile, stat, lstat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
+import { parseTomlConfig } from '../config/parse.js';
 import type { Skill, MCPServer } from '../types/index.js';
 
 export class CodexScanner extends BaseScanner {
@@ -67,12 +68,13 @@ export class CodexScanner extends BaseScanner {
 
     try {
       const content = await readFile(mcpFile, 'utf-8');
-      const config = JSON.parse(content);
-      const mcpServers = config.mcpServers || {};
+      const config = parseTomlConfig<Record<string, any>>(content);
+      const mcpServers = config.mcp_servers || {};
 
       for (const [name, serverConfig] of Object.entries(mcpServers)) {
         const cfg = serverConfig as Record<string, unknown>;
         const command = typeof cfg.command === 'string' ? cfg.command : undefined;
+        const host = typeof cfg.url === 'string' ? cfg.url : undefined;
         const transport = this.detectTransport(cfg);
 
         servers.push({
@@ -80,6 +82,7 @@ export class CodexScanner extends BaseScanner {
           agentSources: [this.agentConfig.name],
           transport,
           command,
+          host,
           isDuplicate: false,
           isEnabled: true,
           canStart: null,

@@ -1,68 +1,31 @@
 import { runInventory } from './scanner/index.js';
-import { normalizeInventory } from './normalizer/index.js';
-import { runAudit } from './auditor/index.js';
 import { writeAllReports } from './dashboard/reporter.js';
-import { join } from 'node:path';
+import { parseCliArgs } from './cli.js';
+import { applySyncPlan } from './sync/apply.js';
+import { writeSyncPlanReports } from './sync/reporter.js';
+import { loadProfiles } from './profiles/loader.js';
+import { createDefaultPaths, executeCommand } from './cli/commands.js';
+import { loadSyncConfig } from './config/sync.js';
+import { restoreSyncBackupManifest } from './sync/restore.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 async function main() {
-  const command = process.argv[2] || 'scan';
-
-  switch (command) {
-    case 'scan': {
-      console.log('Running inventory scan...');
-      const inventory = await runInventory();
-      const normalized = normalizeInventory(inventory);
-      const audit = runAudit(normalized);
-
-      const reportsDir = join(__dirname, '..', 'reports');
-      await writeAllReports(normalized, audit, reportsDir);
-
-      console.log('\n✅ Scan complete!');
-      console.log(`   Skills: ${normalized.skills.length}`);
-      console.log(`   MCP Servers: ${normalized.mcpServers.length}`);
-      console.log(`   Issues: ${audit.issues.length}`);
-      console.log(`\n   Reports written to: ${reportsDir}`);
-      break;
-    }
-
-    case 'audit': {
-      console.log('Running audit...');
-      const inventory = await runInventory();
-      const normalized = normalizeInventory(inventory);
-      const audit = runAudit(normalized);
-
-      console.log('\n📊 Audit Summary');
-      console.log(`   Total Skills: ${audit.summary.totalSkills}`);
-      console.log(`   Total MCP Servers: ${audit.summary.totalMcpServers}`);
-      console.log(`   Duplicate Skills: ${audit.summary.duplicateSkills}`);
-      console.log(`   Duplicate MCPs: ${audit.summary.duplicateMcps}`);
-      console.log(`   Missing SKILL.md: ${audit.summary.missingSkillMds}`);
-      console.log(`   Broken Symlinks: ${audit.summary.brokenSymlinks}`);
-      console.log(`   Sensitive Env: ${audit.summary.sensitiveEnvs}`);
-
-      if (audit.issues.length > 0) {
-        console.log('\n⚠️  Issues found:');
-        for (const issue of audit.issues) {
-          console.log(`   [${issue.severity.toUpperCase()}] ${issue.type}: ${issue.item}`);
-        }
-      }
-      break;
-    }
-
-    case 'sync': {
-      console.log('Sync command not yet implemented.');
-      console.log('Planned: canonical store management with symlink dry-run/apply/restore.');
-      break;
-    }
-
-    default: {
-      console.log('Usage: node dist/index.js [scan|audit|sync]');
-      process.exit(1);
-    }
-  }
+  const cli = parseCliArgs(process.argv.slice(2));
+  const paths = createDefaultPaths(__dirname);
+  const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
+  const output = await executeCommand(cli, {
+    ...paths,
+    approvedSyncRoots: syncConfig.approvedSyncRoots,
+    runInventory,
+    writeAllReports,
+    writeSyncPlanReports,
+    loadProfiles,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+  console.log(output);
 }
 
 main().catch(err => {

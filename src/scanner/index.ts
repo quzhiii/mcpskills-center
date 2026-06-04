@@ -12,19 +12,19 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
     name: 'claude-code',
     configDir: join(HOME, '.claude'),
     skillsDir: join(HOME, '.claude', 'skills'),
-    mcpConfigFile: join(HOME, '.claude', 'settings.json'),
+    mcpConfigFile: join(HOME, '.claude.json'),
   },
   {
     name: 'opencode',
     configDir: join(HOME, '.opencode'),
     skillsDir: join(HOME, '.opencode', 'skills'),
-    mcpConfigFile: join(HOME, '.opencode', 'mcp.json'),
+    mcpConfigFile: join(HOME, '.opencode', 'opencode.json'),
   },
   {
     name: 'codex',
     configDir: join(HOME, '.codex'),
     skillsDir: join(HOME, '.codex', 'skills'),
-    mcpConfigFile: join(HOME, '.codex', 'mcp.json'),
+    mcpConfigFile: join(HOME, '.codex', 'config.toml'),
   },
 ];
 

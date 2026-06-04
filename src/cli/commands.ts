@@ -1,0 +1,218 @@
+import { join } from 'node:path';
+import { runAudit } from '../auditor/index.js';
+import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
+import { normalizeInventory } from '../normalizer/index.js';
+import { planProfile } from '../profiles/planner.js';
+import { applySyncPlan } from '../sync/apply.js';
+import { planSkillSync } from '../sync/planner.js';
+import { restoreSyncBackupManifest } from '../sync/restore.js';
+import type { AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
+import type { CliArgs } from '../cli.js';
+
+export interface CommandContext {
+  reportsDir: string;
+  canonicalSkillsDir: string;
+  backupsDir: string;
+  profilesDir: string;
+  syncConfigPath: string;
+  approvedSyncRoots: string[];
+  runInventory: () => Promise<Inventory>;
+  writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
+  writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
+  loadProfiles: (profilesDir: string) => Promise<Profile[]>;
+  applySyncPlan: typeof applySyncPlan;
+  restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
+}
+
+export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
+  switch (cli.command) {
+    case 'scan':
+      return executeScan(context);
+    case 'audit':
+      return executeAudit(context);
+    case 'sync':
+      return executeSync(cli, context);
+    case 'profile':
+      return executeProfile(cli, context);
+    case 'health':
+      return executeHealth(cli, context);
+    case 'help':
+      return renderHelp();
+  }
+}
+
+export function renderHelp(): string {
+  return [
+    'Usage: node dist/index.js [command] [options]',
+    '',
+    'Commands:',
+    '  scan                         Scan inventory and write reports',
+    '  audit                        Print audit summary',
+    '  sync --dry-run               Generate sync dry-run plan and reports',
+    '  sync --apply --confirm       Apply sync plan with backup manifest',
+    '  sync --restore <manifest>    Restore a prior sync apply from manifest',
+    '  profile list                 List local profiles',
+    '  profile show <name>          Show a profile JSON',
+    '  profile plan <name>          Plan profile changes without writing',
+    '  health                       Run passive MCP health checks',
+    '  health --active --allow-command <cmd> --timeout <ms>',
+    '  help                         Show this help',
+  ].join('\n');
+}
+
+async function executeScan(context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const audit = runAudit(normalized);
+  await context.writeAllReports(normalized, audit, context.reportsDir);
+
+  return [
+    'Scan complete!',
+    `   Skills: ${normalized.skills.length}`,
+    `   MCP Servers: ${normalized.mcpServers.length}`,
+    `   Issues: ${audit.issues.length}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+  ].join('\n');
+}
+
+async function executeAudit(context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const audit = runAudit(normalized);
+  const lines = [
+    'Audit Summary',
+    `   Total Skills: ${audit.summary.totalSkills}`,
+    `   Total MCP Servers: ${audit.summary.totalMcpServers}`,
+    `   Duplicate Skills: ${audit.summary.duplicateSkills}`,
+    `   Duplicate MCPs: ${audit.summary.duplicateMcps}`,
+    `   Missing SKILL.md: ${audit.summary.missingSkillMds}`,
+    `   Broken Symlinks: ${audit.summary.brokenSymlinks}`,
+    `   Sensitive Env: ${audit.summary.sensitiveEnvs}`,
+  ];
+
+  if (audit.issues.length > 0) {
+    lines.push('', 'Issues found:');
+    for (const issue of audit.issues) {
+      lines.push(`   [${issue.severity.toUpperCase()}] ${issue.type}: ${issue.item}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+async function executeSync(cli: CliArgs, context: CommandContext): Promise<string> {
+  if (cli.options.restoreManifestPath) {
+    const result = await context.restoreSyncBackupManifest(cli.options.restoreManifestPath, {
+      approvedRoots: context.approvedSyncRoots,
+    });
+    return [
+      'Sync restore complete!',
+      `   Restored Entries: ${result.restoredEntries.length}`,
+      `   Manifest: ${cli.options.restoreManifestPath}`,
+    ].join('\n');
+  }
+
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const audit = runAudit(normalized);
+  const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
+  const plan = planSkillSync(normalized, {
+    canonicalSkillsDir,
+    strategy: 'symlink',
+    agentNames: normalized.agents.map(agent => agent.name),
+  });
+
+  if (cli.options.apply) {
+    const result = await context.applySyncPlan(plan, {
+      confirm: cli.options.confirm,
+      backupsDir: context.backupsDir,
+      approvedRoots: context.approvedSyncRoots,
+    });
+
+    return [
+      'Sync apply complete!',
+      `   Applied Actions: ${result.appliedActions.length}`,
+      `   Backup Entries: ${result.backupEntries.length}`,
+      `   Manifest: ${result.manifestPath}`,
+    ].join('\n');
+  }
+
+  await context.writeAllReports(normalized, audit, context.reportsDir);
+  await context.writeSyncPlanReports(plan, context.reportsDir);
+
+  return [
+    'Sync dry-run complete!',
+    `   Skills: ${normalized.skills.length}`,
+    `   MCP Servers: ${normalized.mcpServers.length}`,
+    `   Audit Issues: ${audit.issues.length}`,
+    `   Sync Actions: ${plan.actions.length}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+  ].join('\n');
+}
+
+async function executeProfile(cli: CliArgs, context: CommandContext): Promise<string> {
+  const profiles = await context.loadProfiles(context.profilesDir);
+  const subcommand = cli.options.subcommand ?? 'list';
+
+  switch (subcommand) {
+    case 'list':
+      return ['Available profiles:', ...profiles.map(profile => `   ${profile.name} - ${profile.description}`)].join('\n');
+    case 'show':
+      return JSON.stringify(findProfile(profiles, cli.options.profileName), null, 2);
+    case 'plan': {
+      const profile = findProfile(profiles, cli.options.profileName);
+      const inventory = await context.runInventory();
+      const normalized = normalizeInventory(inventory);
+      const plan = planProfile(profile, normalized);
+      return [
+        `Profile plan: ${plan.profileName}`,
+        ...plan.actions.map(action => `   [${action.type}] ${action.targetType}: ${action.targetId} - ${action.reason}`),
+      ].join('\n');
+    }
+    default:
+      return 'Usage: node dist/index.js profile [list|show|plan] [name]';
+  }
+}
+
+async function executeHealth(cli: CliArgs, context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const lines = [cli.options.active ? 'Running active MCP health checks...' : 'Running passive MCP health checks...'];
+
+  for (const mcp of normalized.mcpServers) {
+    const result = cli.options.active
+      ? await runActiveMcpHealth(mcp, {
+        allowCommands: cli.options.allowCommands,
+        timeoutMs: cli.options.timeoutMs,
+      })
+      : evaluateMcpHealth(mcp);
+    lines.push(`   [${result.status.toUpperCase()}] ${result.serverId}: ${result.reasons.join('; ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+function findProfile<T extends { name: string }>(profiles: T[], name: string | undefined): T {
+  if (!name) throw new Error('Profile name is required');
+  const profile = profiles.find(item => item.name === name);
+  if (!profile) throw new Error(`Profile not found: ${name}`);
+  return profile;
+}
+
+export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'approvedSyncRoots'> {
+  return {
+    reportsDir: join(dirname, '..', 'reports'),
+    canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
+    backupsDir: join(dirname, '..', 'backups'),
+    profilesDir: join(dirname, '..', 'config', 'profiles'),
+    syncConfigPath: join(dirname, '..', 'config', 'sync.json'),
+    approvedSyncRoots: [
+      join(dirname, '..', 'config', 'canonical-skills'),
+      'C:/Users/quzhi/.claude/skills',
+      'C:/Users/quzhi/.opencode/skills',
+      'C:/Users/quzhi/.codex/skills',
+    ],
+  };
+}

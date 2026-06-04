@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test dist/**/*.test.js",
     "scan": "node dist/index.js scan",
     "audit": "node dist/index.js audit",
     "sync": "node dist/index.js sync",
@@ -23,6 +24,9 @@
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "smol-toml": "^1.6.1"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

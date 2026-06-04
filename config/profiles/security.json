@@ -1,0 +1,7 @@
+{
+  "name": "security",
+  "description": "Security review profile for audit and defensive workflows.",
+  "agents": ["claude-code"],
+  "mcpServers": ["agentmemory"],
+  "skills": ["guard", "review", "systematic-debugging"]
+}
