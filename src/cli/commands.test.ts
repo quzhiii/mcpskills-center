@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { executeCommand, renderHelp } from './commands.js';
 import { applySyncPlan } from '../sync/apply.js';
 import type { CliArgs } from '../cli.js';
-import type { Inventory, Profile } from '../types/index.js';
+import type { AgentConfig, Inventory, Profile } from '../types/index.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 
 function makeCli(command: CliArgs['command'], options: Partial<CliArgs['options']> = {}): CliArgs {
@@ -64,6 +64,29 @@ const profiles: Profile[] = [
   },
 ];
 
+const agents: AgentConfig[] = [
+  {
+    name: 'claude-code',
+    id: 'claude-code',
+    displayName: 'Claude Code',
+    scannerType: 'claude-code',
+    enabled: true,
+    readOnly: false,
+    configDir: 'C:/claude',
+    skillsDir: 'C:/claude/skills',
+  },
+  {
+    name: 'qoder',
+    id: 'qoder',
+    displayName: 'Qoder',
+    scannerType: 'generic',
+    enabled: false,
+    readOnly: true,
+    configDir: 'C:/qoder',
+    skillsDir: 'C:/qoder/skills',
+  },
+];
+
 test('renderHelp includes current commands', () => {
   const help = renderHelp();
 
@@ -71,7 +94,31 @@ test('renderHelp includes current commands', () => {
   assert.match(help, /audit/);
   assert.match(help, /sync --dry-run/);
   assert.match(help, /profile list/);
+  assert.match(help, /agents list/);
   assert.match(help, /health/);
+});
+
+test('executeCommand handles agents list through injected registry', async () => {
+  const output = await executeCommand(makeCli('agents', { subcommand: 'list' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Registered agents:/);
+  assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable\]/);
+  assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only\]/);
 });
 
 test('executeCommand handles scan through injected dependencies', async () => {
@@ -88,6 +135,7 @@ test('executeCommand handles scan through injected dependencies', async () => {
     writeAllReports: async () => { writes.push('all-reports'); },
     writeSyncPlanReports: async () => { writes.push('sync-plan'); },
     loadProfiles: async () => profiles,
+    listAgents: async () => agents,
     applySyncPlan,
     restoreSyncBackupManifest,
   });
@@ -109,6 +157,7 @@ test('executeCommand handles profile plan through injected dependencies', async 
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
+    listAgents: async () => agents,
     applySyncPlan,
     restoreSyncBackupManifest,
   });
@@ -145,6 +194,7 @@ test('executeCommand handles sync apply through injected dependencies', async ()
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
+    listAgents: async () => agents,
     applySyncPlan: async () => ({
       manifestPath: 'C:/backups/manifest.json',
       appliedActions: [
@@ -181,6 +231,7 @@ test('executeCommand handles sync restore through injected dependencies', async 
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
+    listAgents: async () => agents,
     applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [] }),
     restoreSyncBackupManifest: async () => ({
       restoredEntries: [

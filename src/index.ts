@@ -25,6 +25,7 @@ async function main() {
     writeAllReports,
     writeSyncPlanReports,
     loadProfiles,
+    listAgents: async () => agentRegistry.agents,
     applySyncPlan,
     restoreSyncBackupManifest,
   });

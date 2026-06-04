@@ -6,7 +6,7 @@ import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
-import type { AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
+import type { AgentConfig, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 
 export interface CommandContext {
@@ -21,6 +21,7 @@ export interface CommandContext {
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
+  listAgents: () => Promise<AgentConfig[]>;
   applySyncPlan: typeof applySyncPlan;
   restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
 }
@@ -35,6 +36,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeSync(cli, context);
     case 'profile':
       return executeProfile(cli, context);
+    case 'agents':
+      return executeAgents(cli, context);
     case 'health':
       return executeHealth(cli, context);
     case 'help':
@@ -55,6 +58,7 @@ export function renderHelp(): string {
     '  profile list                 List local profiles',
     '  profile show <name>          Show a profile JSON',
     '  profile plan <name>          Plan profile changes without writing',
+    '  agents list                  List registered local agents',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
     '  help                         Show this help',
@@ -193,6 +197,22 @@ async function executeHealth(cli: CliArgs, context: CommandContext): Promise<str
   }
 
   return lines.join('\n');
+}
+
+async function executeAgents(cli: CliArgs, context: CommandContext): Promise<string> {
+  const subcommand = cli.options.subcommand ?? 'list';
+
+  switch (subcommand) {
+    case 'list': {
+      const agents = await context.listAgents();
+      return [
+        'Registered agents:',
+        ...agents.map(agent => `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}]`),
+      ].join('\n');
+    }
+    default:
+      return 'Usage: node dist/index.js agents [list]';
+  }
 }
 
 function findProfile<T extends { name: string }>(profiles: T[], name: string | undefined): T {
