@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { ClaudeCodeScanner } from './claude-code.js';
 import { OpenCodeScanner } from './opencode.js';
 import { CodexScanner } from './codex.js';
+import { createDefaultScannerRegistry } from './registry.js';
 import type { AgentConfig, Inventory, Skill, MCPServer } from '../types/index.js';
+import type { ScannerRegistry } from './registry.js';
 
 const HOME = homedir();
 
@@ -28,25 +30,18 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
   },
 ];
 
-export async function runInventory(agents: AgentConfig[] = DEFAULT_AGENTS): Promise<Inventory> {
+export async function runInventory(
+  agents: AgentConfig[] = DEFAULT_AGENTS,
+  scannerRegistry: ScannerRegistry = createDefaultScannerRegistry()
+): Promise<Inventory> {
   const allSkills: Skill[] = [];
   const allMcps: MCPServer[] = [];
 
   for (const agent of agents) {
-    let scanner;
-    switch (agent.scannerType ?? agent.name) {
-      case 'claude-code':
-        scanner = new ClaudeCodeScanner(agent);
-        break;
-      case 'opencode':
-        scanner = new OpenCodeScanner(agent);
-        break;
-      case 'codex':
-        scanner = new CodexScanner(agent);
-        break;
-      default:
-        console.warn(`Unknown agent: ${agent.name}`);
-        continue;
+    const scanner = scannerRegistry.createScanner(agent);
+    if (!scanner) {
+      console.warn(`Unknown scanner type for agent: ${agent.name}`);
+      continue;
     }
 
     const skills = await scanner.scanSkills();
