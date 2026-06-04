@@ -75,6 +75,8 @@ test('sync apply and restore simulate safely in an isolated CLI environment', as
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => [],
     listAgents: async () => inventory.agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan,
     restoreSyncBackupManifest,
   };

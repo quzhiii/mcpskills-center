@@ -16,6 +16,28 @@ export interface AgentRegistry {
   agents: AgentConfig[];
 }
 
+export type AgentDiscoveryStatus = 'confirmed' | 'candidate' | 'missing' | 'unsupported';
+
+export interface AgentDiscoveryCandidate {
+  agentId: string;
+  displayName: string;
+  status: AgentDiscoveryStatus;
+  path: string;
+  reason: string;
+}
+
+export interface AgentDiscoveryReport {
+  generatedAt: string;
+  candidates: AgentDiscoveryCandidate[];
+}
+
+export interface AgentDiscoverySpec {
+  agentId: string;
+  displayName: string;
+  relativePaths: string[];
+  confirmFiles: string[];
+}
+
 export interface Skill {
   id: string;
   displayName: string;

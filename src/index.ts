@@ -9,6 +9,8 @@ import { loadSyncConfig } from './config/sync.js';
 import { restoreSyncBackupManifest } from './sync/restore.js';
 import { loadAgentRegistry } from './config/agents.js';
 import { DEFAULT_AGENTS } from './scanner/index.js';
+import { discoverAgents } from './agents/discovery.js';
+import { writeAgentDiscoveryReports } from './agents/reporter.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -26,6 +28,8 @@ async function main() {
     writeSyncPlanReports,
     loadProfiles,
     listAgents: async () => agentRegistry.agents,
+    discoverAgents,
+    writeAgentDiscoveryReports,
     applySyncPlan,
     restoreSyncBackupManifest,
   });

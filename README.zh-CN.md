@@ -120,6 +120,8 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 | `node dist/index.js profile list` | 列出本地 profile | 无 |
 | `node dist/index.js profile show <name>` | 打印一个 profile 的 JSON | 无 |
 | `node dist/index.js profile plan <name>` | 将 profile 与当前 inventory 对比 | 无 |
+| `node dist/index.js agents list` | 列出 `config/agents.json` 中注册的本地 agents | 无 |
+| `node dist/index.js agents discover` | 发现 Qoder、CodeBuddy、WorkBuddy、Trae 等本地 agent 配置候选路径 | `reports/` |
 | `node dist/index.js health` | 执行被动 MCP 健康检查 | 无 |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | 对 allowlist 中的命令做显式主动探测 | 无 |
 | `node dist/index.js help` | 查看 CLI 帮助 | 无 |
@@ -184,7 +186,23 @@ node dist/index.js profile plan coding
 
 输出会按 `already-present`、`missing`、`disable` 三类展示，不会修改 live config。
 
-### 7. 先做安全的被动 MCP 健康检查
+### 7. 查看已注册的本地 agents
+
+```bash
+node dist/index.js agents list
+```
+
+这个命令只读取 registry，不扫描 live config。默认 registry 包含 Claude Code、OpenCode、Codex，以及 disabled/read-only 的 Qoder、Qoder Work、CodeBuddy、WorkBuddy、Trae 占位配置。
+
+### 8. 发现本地 agent 候选配置路径
+
+```bash
+node dist/index.js agents discover
+```
+
+Discovery 是只读操作。它会检查常见本地路径，并写出 `reports/agent-discovery-current.json` 与 `reports/agent-discovery-current.md`。
+
+### 9. 先做安全的被动 MCP 健康检查
 
 ```bash
 node dist/index.js health
@@ -192,7 +210,7 @@ node dist/index.js health
 
 被动模式不会启动命令，只检查 transport 形态、command 是否存在、URL 是否有效、敏感 env key 风险等。
 
-### 8. 对 allowlist 命令做显式主动探测
+### 10. 对 allowlist 命令做显式主动探测
 
 ```bash
 node dist/index.js health --active --allow-command npx --timeout 3000

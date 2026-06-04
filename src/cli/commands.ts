@@ -6,7 +6,7 @@ import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
-import type { AgentConfig, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
+import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 
 export interface CommandContext {
@@ -22,6 +22,8 @@ export interface CommandContext {
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
   listAgents: () => Promise<AgentConfig[]>;
+  discoverAgents: () => Promise<AgentDiscoveryReport>;
+  writeAgentDiscoveryReports: (report: AgentDiscoveryReport, reportsDir: string) => Promise<void>;
   applySyncPlan: typeof applySyncPlan;
   restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
 }
@@ -59,6 +61,7 @@ export function renderHelp(): string {
     '  profile show <name>          Show a profile JSON',
     '  profile plan <name>          Plan profile changes without writing',
     '  agents list                  List registered local agents',
+    '  agents discover              Discover local agent config candidates',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
     '  help                         Show this help',
@@ -210,8 +213,18 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
         ...agents.map(agent => `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}]`),
       ].join('\n');
     }
+    case 'discover': {
+      const report = await context.discoverAgents();
+      await context.writeAgentDiscoveryReports(report, context.reportsDir);
+      return [
+        'Agent discovery complete!',
+        `   Candidates: ${report.candidates.length}`,
+        '',
+        `   Reports written to: ${context.reportsDir}`,
+      ].join('\n');
+    }
     default:
-      return 'Usage: node dist/index.js agents [list]';
+      return 'Usage: node dist/index.js agents [list|discover]';
   }
 }
 

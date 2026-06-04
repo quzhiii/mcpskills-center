@@ -112,6 +112,8 @@ test('executeCommand handles agents list through injected registry', async () =>
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan,
     restoreSyncBackupManifest,
   });
@@ -119,6 +121,38 @@ test('executeCommand handles agents list through injected registry', async () =>
   assert.match(output, /Registered agents:/);
   assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable\]/);
   assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only\]/);
+});
+
+test('executeCommand handles agents discover and writes reports', async () => {
+  const writes: string[] = [];
+  const output = await executeCommand(makeCli('agents', { subcommand: 'discover' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({
+      generatedAt: '2026-06-04T00:00:00.000Z',
+      candidates: [
+        { agentId: 'qoder', displayName: 'Qoder', status: 'candidate', path: 'C:/qoder', reason: 'Directory exists' },
+      ],
+    }),
+    writeAgentDiscoveryReports: async () => { writes.push('agent-discovery'); },
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Agent discovery complete!/);
+  assert.match(output, /Candidates: 1/);
+  assert.match(output, /Reports written to: C:\/reports/);
+  assert.deepEqual(writes, ['agent-discovery']);
 });
 
 test('executeCommand handles scan through injected dependencies', async () => {
@@ -136,6 +170,8 @@ test('executeCommand handles scan through injected dependencies', async () => {
     writeSyncPlanReports: async () => { writes.push('sync-plan'); },
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan,
     restoreSyncBackupManifest,
   });
@@ -158,6 +194,8 @@ test('executeCommand handles profile plan through injected dependencies', async 
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan,
     restoreSyncBackupManifest,
   });
@@ -195,6 +233,8 @@ test('executeCommand handles sync apply through injected dependencies', async ()
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan: async () => ({
       manifestPath: 'C:/backups/manifest.json',
       appliedActions: [
@@ -232,6 +272,8 @@ test('executeCommand handles sync restore through injected dependencies', async 
     writeSyncPlanReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [] }),
     restoreSyncBackupManifest: async () => ({
       restoredEntries: [
