@@ -59,6 +59,7 @@ test('createDefaultScannerRegistry includes built-in scanners', () => {
   assert.notEqual(registry.createScanner({ ...agent, name: 'claude-code', scannerType: 'claude-code' }), null);
   assert.notEqual(registry.createScanner({ ...agent, name: 'opencode', scannerType: 'opencode' }), null);
   assert.notEqual(registry.createScanner({ ...agent, name: 'codex', scannerType: 'codex' }), null);
+  assert.notEqual(registry.createScanner({ ...agent, name: 'trae', scannerType: 'generic' }), null);
 });
 
 test('runInventory uses injected scanner registry and skips unknown scanners', async () => {

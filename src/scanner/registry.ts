@@ -1,5 +1,6 @@
 import { ClaudeCodeScanner } from './claude-code.js';
 import { CodexScanner } from './codex.js';
+import { GenericScanner } from './generic.js';
 import { OpenCodeScanner } from './opencode.js';
 import type { BaseScanner } from './base.js';
 import type { AgentConfig } from '../types/index.js';
@@ -27,5 +28,6 @@ export function createDefaultScannerRegistry(): ScannerRegistry {
     ['claude-code', agent => new ClaudeCodeScanner(agent)],
     ['opencode', agent => new OpenCodeScanner(agent)],
     ['codex', agent => new CodexScanner(agent)],
+    ['generic', agent => new GenericScanner(agent)],
   ]);
 }
