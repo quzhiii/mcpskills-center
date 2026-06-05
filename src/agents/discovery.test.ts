@@ -174,3 +174,22 @@ test('discoverAgents does not treat .qoder.json as a confirm file for legacy qod
   assert.equal(candidate?.path, legacyQoderWorkRoot);
   assert.equal(candidate?.reason, 'Directory exists but no known config file was found');
 });
+
+test('discoverAgents confirms qoder-work from observed QoderWork CN AppData root', async () => {
+  const root = await makeTempRoot();
+  const qoderWorkCnAppDataRoot = join(root, 'AppData', 'Roaming', 'QoderWork CN');
+
+  await mkdir(qoderWorkCnAppDataRoot, { recursive: true });
+  await writeFile(join(qoderWorkCnAppDataRoot, '.builtin-defaults-state-v3.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder-work');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, qoderWorkCnAppDataRoot);
+  assert.equal(candidate?.reason, 'Found .builtin-defaults-state-v3.json');
+});

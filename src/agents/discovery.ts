@@ -14,10 +14,11 @@ export const DEFAULT_AGENT_DISCOVERY_SPECS: AgentDiscoverySpec[] = [
   {
     agentId: 'qoder-work',
     displayName: 'Qoder Work',
-    relativePaths: ['.qoderworkcn', '.qoder-work', 'AppData/Roaming/Qoder Work', 'AppData/Local/Qoder Work', '.config/qoder-work'],
+    relativePaths: ['.qoderworkcn', '.qoder-work', 'AppData/Roaming/QoderWork CN', 'AppData/Roaming/Qoder Work', 'AppData/Local/Qoder Work', '.config/qoder-work'],
     confirmFiles: ['config.json', 'settings.json'],
     confirmFilesByPath: {
       '.qoderworkcn': ['.qoder.json'],
+      'AppData/Roaming/QoderWork CN': ['.builtin-defaults-state-v3.json', 'versions.json'],
     },
     manualReviewOnMultipleConfirmed: true,
   },
