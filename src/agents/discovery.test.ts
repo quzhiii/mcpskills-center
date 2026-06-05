@@ -193,3 +193,45 @@ test('discoverAgents confirms qoder-work from observed QoderWork CN AppData root
   assert.equal(candidate?.path, qoderWorkCnAppDataRoot);
   assert.equal(candidate?.reason, 'Found .builtin-defaults-state-v3.json');
 });
+
+test('discoverAgents confirms qoder-work from AppData root via versions.json fallback', async () => {
+  const root = await makeTempRoot();
+  const qoderWorkCnAppDataRoot = join(root, 'AppData', 'Roaming', 'QoderWork CN');
+
+  await mkdir(qoderWorkCnAppDataRoot, { recursive: true });
+  await writeFile(join(qoderWorkCnAppDataRoot, 'versions.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder-work');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, qoderWorkCnAppDataRoot);
+  assert.equal(candidate?.reason, 'Found versions.json');
+});
+
+test('discoverAgents marks qoder-work as candidate when home and AppData roots are both confirmed', async () => {
+  const root = await makeTempRoot();
+  const qoderWorkCnRoot = join(root, '.qoderworkcn');
+  const qoderWorkCnAppDataRoot = join(root, 'AppData', 'Roaming', 'QoderWork CN');
+
+  await mkdir(qoderWorkCnRoot, { recursive: true });
+  await mkdir(qoderWorkCnAppDataRoot, { recursive: true });
+  await writeFile(join(qoderWorkCnRoot, '.qoder.json'), '{}', 'utf-8');
+  await writeFile(join(qoderWorkCnAppDataRoot, '.builtin-defaults-state-v3.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder-work');
+
+  assert.equal(candidate?.status, 'candidate');
+  assert.equal(candidate?.path, undefined);
+  assert.deepEqual(candidate?.paths, [qoderWorkCnRoot, qoderWorkCnAppDataRoot]);
+  assert.equal(candidate?.reason, 'Multiple known config roots were confirmed; manual review needed');
+});
