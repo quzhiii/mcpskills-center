@@ -10,7 +10,15 @@ export interface DiscoverAgentsOptions {
 }
 
 export const DEFAULT_AGENT_DISCOVERY_SPECS: AgentDiscoverySpec[] = [
-  { agentId: 'qoder', displayName: 'Qoder', relativePaths: ['.qoder', 'AppData/Roaming/Qoder', 'AppData/Local/Qoder', '.config/qoder'], confirmFiles: ['config.json', 'settings.json'] },
+  {
+    agentId: 'qoder',
+    displayName: 'Qoder',
+    relativePaths: ['.qoder', 'AppData/Roaming/Qoder', 'AppData/Local/Qoder', '.config/qoder'],
+    confirmFiles: ['config.json', 'settings.json'],
+    confirmFilesByPath: {
+      'AppData/Roaming/Qoder': ['User/settings.json', 'User/app.json'],
+    },
+  },
   {
     agentId: 'qoder-work',
     displayName: 'Qoder Work',
@@ -54,7 +62,8 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
   for (const { relativePath, candidatePath } of checkedPaths) {
     if (!(await pathExists(candidatePath))) continue;
 
-    const confirmFiles = spec.confirmFilesByPath?.[relativePath] ?? spec.confirmFiles;
+    const pathSpecificConfirmFiles = spec.confirmFilesByPath?.[relativePath] ?? [];
+    const confirmFiles = [...pathSpecificConfirmFiles, ...spec.confirmFiles];
     const foundConfirmFile = await findConfirmFile(candidatePath, confirmFiles);
     if (foundConfirmFile) {
       if (!spec.manualReviewOnMultipleConfirmed) {

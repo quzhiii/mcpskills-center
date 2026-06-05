@@ -194,6 +194,44 @@ test('discoverAgents confirms qoder-work from observed QoderWork CN AppData root
   assert.equal(candidate?.reason, 'Found .builtin-defaults-state-v3.json');
 });
 
+test('discoverAgents confirms qoder from AppData root via nested User/settings.json', async () => {
+  const root = await makeTempRoot();
+  const qoderAppDataRoot = join(root, 'AppData', 'Roaming', 'Qoder');
+
+  await mkdir(join(qoderAppDataRoot, 'User'), { recursive: true });
+  await writeFile(join(qoderAppDataRoot, 'User', 'settings.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, qoderAppDataRoot);
+  assert.equal(candidate?.reason, 'Found User/settings.json');
+});
+
+test('discoverAgents still confirms qoder from AppData root via top-level settings.json fallback', async () => {
+  const root = await makeTempRoot();
+  const qoderAppDataRoot = join(root, 'AppData', 'Roaming', 'Qoder');
+
+  await mkdir(qoderAppDataRoot, { recursive: true });
+  await writeFile(join(qoderAppDataRoot, 'settings.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, qoderAppDataRoot);
+  assert.equal(candidate?.reason, 'Found settings.json');
+});
+
 test('discoverAgents confirms qoder-work from AppData root via versions.json fallback', async () => {
   const root = await makeTempRoot();
   const qoderWorkCnAppDataRoot = join(root, 'AppData', 'Roaming', 'QoderWork CN');
