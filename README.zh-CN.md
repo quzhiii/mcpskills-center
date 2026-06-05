@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**面向 Claude Code、OpenCode、Codex 的本地优先 CLI，用来扫描、审计、规划和同步 MCP server 与 agent skills。**
+**面向 Claude Code、OpenCode、Codex 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -22,7 +22,7 @@
 
 MCPskills Center 给一台本地机器上的多套 agent 能力提供统一的可视化和治理入口。
 
-它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
+它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run skill 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
 
 ```text
 Claude Code 配置 ─┐
@@ -45,6 +45,8 @@ Codex 配置 ───────┘                      │
 | Profiles | 以 `coding`、`research` 等场景包做只读规划 |
 | Health 检查 | 默认被动检查，显式 allowlist 后才做主动命令探测 |
 | Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
+
+各 agent 当前支持状态可见 `docs/supported-agents.md`。
 
 ---
 
@@ -198,7 +200,7 @@ node dist/index.js profile plan coding
 node dist/index.js agents list
 ```
 
-这个命令只读取 registry，不扫描 live config。默认 registry 包含 Claude Code、OpenCode、Codex，以及 disabled/read-only 的 Qoder、Qoder Work、CodeBuddy、WorkBuddy、Trae 占位配置。
+这个命令只读取当前加载后的 registry，不扫描 live config。仓库里的 `config/agents.json` 还包含 Qoder、Qoder Work、CodeBuddy、WorkBuddy、Trae 的 disabled/read-only 占位配置，但 disabled 条目不会出现在运行时加载后的列表里。
 
 ### 8. 发现本地 agent 候选配置路径
 

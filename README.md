@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Local-first CLI for scanning, auditing, planning, and synchronizing MCP servers and agent skills across Claude Code, OpenCode, and Codex.**
+**Local-first CLI for scanning, auditing, planning, and synchronizing agent skills while inventorying MCP servers across Claude Code, OpenCode, and Codex.**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -22,7 +22,7 @@
 
 MCPskills Center gives one local machine a clear control surface for agent capabilities that are usually scattered across multiple tools.
 
-It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run sync plans, checks health status, and renders readable reports for review.
+It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run skill sync plans, checks health status, and renders readable reports for review.
 
 ```text
 Claude Code config ─┐
@@ -45,6 +45,8 @@ The current release focuses on a practical local workflow:
 | Profiles | Read-only planning for scenario-based capability bundles such as `coding` or `research` |
 | Health checks | Passive validation by default, explicit active command probing when allowlisted |
 | Dashboard | Static offline HTML report at `reports/dashboard.html` |
+
+Agent support status is summarized in `docs/supported-agents.md`.
 
 ---
 
@@ -198,7 +200,7 @@ This reports `already-present`, `missing`, and `disable` actions for the named p
 node dist/index.js agents list
 ```
 
-Use this to review the current registry without scanning live config. The default registry includes Claude Code, OpenCode, Codex, and disabled read-only placeholders for Qoder, Qoder Work, CodeBuddy, WorkBuddy, and Trae.
+Use this to review the currently loaded registry without scanning live config. The checked-in `config/agents.json` also contains disabled read-only entries for Qoder, Qoder Work, CodeBuddy, WorkBuddy, and Trae, but disabled entries are filtered out of the runtime-loaded list.
 
 ### 8. Discover local agent candidates
 
