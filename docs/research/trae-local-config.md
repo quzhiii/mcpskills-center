@@ -32,6 +32,7 @@ Observed structure is a direct directory-per-skill layout.
 ### MCP
 
 - `%APPDATA%/Trae/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- `%APPDATA%/Trae/User/globalStorage/shengsuan-cloud.cline-shengsuan/settings/cline_mcp_settings.json`
 
 Observed example:
 
@@ -40,6 +41,22 @@ Observed example:
   "mcpServers": {}
 }
 ```
+
+On this machine, both known `cline_mcp_settings.json` locations currently contain empty `mcpServers` objects.
+
+## Additional Runtime Inputs Checked
+
+- `%APPDATA%/Trae/User/globalStorage/storage.json`
+- `%APPDATA%/Trae/Local State`
+- `%APPDATA%/Trae/ahanet/server.json`
+- `%APPDATA%/Trae/ModularData/ttnet/server.json`
+
+Observed conclusions:
+
+- `storage.json` is dominated by window state, workspace restoration, extension import history, theme/layout state, and account/session metadata.
+- `Local State` is OS-crypt/browser-platform state, not MCP registry state.
+- `ahanet/server.json` and `ModularData/ttnet/server.json` look like network routing/runtime delivery config, not MCP server enablement.
+- In the files checked during this research pass, no stronger first-party MCP registry was confirmed beyond the two empty `cline_mcp_settings.json` files.
 
 Fixture used for scanner tests:
 
@@ -67,6 +84,7 @@ These are useful for future product understanding but not needed for the initial
 - Reuse generic skill-directory scanning rules against `~/.trae/skills`.
 - Read-only parse of `cline_mcp_settings.json` when configured.
 - Keep transport detection identical to current JSON MCP scanners.
+- Treat the current dedicated read-only scanner as the practical ceiling for the currently verified files until a stronger MCP source of truth is found.
 
 ## Out Of Scope
 
@@ -77,3 +95,5 @@ These are useful for future product understanding but not needed for the initial
 ## Follow-up
 
 - If Trae later exposes a first-party MCP registry outside the Cline compatibility path, add fixtures and switch to that source only after verifying backward-compat behavior.
+- Re-check whether either `cline_mcp_settings.json` becomes populated after enabling a real MCP connector in Trae.
+- Re-check whether any future `User/globalStorage` or app-root cache file starts carrying non-empty MCP runtime state.
