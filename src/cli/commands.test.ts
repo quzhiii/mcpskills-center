@@ -149,8 +149,8 @@ test('executeCommand handles agents list through injected registry', async () =>
   });
 
   assert.match(output, /Registered agents:/);
-  assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable\]/);
-  assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only\]/);
+  assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable, support: dedicated read-only plus write-ready workflow support, source-of-truth: high\]/);
+  assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only, support: generic read-only placeholder, source-of-truth: low\]/);
 });
 
 test('executeCommand handles agents discover and writes reports', async () => {

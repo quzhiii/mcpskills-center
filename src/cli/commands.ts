@@ -230,7 +230,10 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
       const agents = await context.listAgents();
       return [
         'Registered agents:',
-        ...agents.map(agent => `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}]`),
+        ...agents.map(agent => {
+          const support = describeAgentSupport(agent.id ?? agent.name);
+          return `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}, support: ${support.level}, source-of-truth: ${support.confidence}]`;
+        }),
       ].join('\n');
     }
     case 'discover': {
@@ -245,6 +248,24 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
     }
     default:
       return 'Usage: node dist/index.js agents [list|discover]';
+  }
+}
+
+function describeAgentSupport(agentId: string): { level: string; confidence: 'high' | 'medium' | 'low' } {
+  switch (agentId) {
+    case 'claude-code':
+    case 'opencode':
+    case 'codex':
+      return { level: 'dedicated read-only plus write-ready workflow support', confidence: 'high' };
+    case 'codebuddy':
+    case 'workbuddy':
+    case 'trae':
+      return { level: 'dedicated read-only', confidence: agentId === 'trae' ? 'low' : 'medium' };
+    case 'qoder':
+    case 'qoder-work':
+      return { level: 'generic read-only placeholder', confidence: 'low' };
+    default:
+      return { level: 'generic read-only placeholder', confidence: 'low' };
   }
 }
 
