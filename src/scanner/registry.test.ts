@@ -59,7 +59,9 @@ test('createDefaultScannerRegistry includes built-in scanners', () => {
   assert.notEqual(registry.createScanner({ ...agent, name: 'claude-code', scannerType: 'claude-code' }), null);
   assert.notEqual(registry.createScanner({ ...agent, name: 'opencode', scannerType: 'opencode' }), null);
   assert.notEqual(registry.createScanner({ ...agent, name: 'codex', scannerType: 'codex' }), null);
-  assert.notEqual(registry.createScanner({ ...agent, name: 'trae', scannerType: 'generic' }), null);
+  assert.notEqual(registry.createScanner({ ...agent, name: 'codebuddy', scannerType: 'codebuddy' }), null);
+  assert.notEqual(registry.createScanner({ ...agent, name: 'workbuddy', scannerType: 'workbuddy' }), null);
+  assert.notEqual(registry.createScanner({ ...agent, name: 'trae', scannerType: 'trae' }), null);
   assert.notEqual(registry.createScanner({ ...agent, name: 'qoder', scannerType: 'generic' }), null);
 });
 

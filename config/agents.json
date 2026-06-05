@@ -50,38 +50,41 @@
       "scannerType": "generic",
       "enabled": false,
       "readOnly": true,
-      "configDir": "~/.qoder-work",
-      "skillsDir": "~/.qoder-work/skills"
+      "configDir": "~/.qoderworkcn",
+      "skillsDir": "~/.qoderworkcn/skills"
     },
     {
       "id": "codebuddy",
       "displayName": "CodeBuddy",
       "vendor": "CodeBuddy",
-      "scannerType": "generic",
+      "scannerType": "codebuddy",
       "enabled": false,
       "readOnly": true,
       "configDir": "~/.codebuddy",
-      "skillsDir": "~/.codebuddy/skills"
+      "skillsDir": "~/.codebuddy/skills-marketplace/skills",
+      "mcpConfigFile": "~/.codebuddy/mcp.json"
     },
     {
       "id": "workbuddy",
       "displayName": "WorkBuddy",
       "vendor": "WorkBuddy",
-      "scannerType": "generic",
+      "scannerType": "workbuddy",
       "enabled": false,
       "readOnly": true,
       "configDir": "~/.workbuddy",
-      "skillsDir": "~/.workbuddy/skills"
+      "skillsDir": "~/.workbuddy/skills",
+      "mcpConfigFile": "~/.workbuddy/.mcp.json"
     },
     {
       "id": "trae",
       "displayName": "Trae",
       "vendor": "Trae",
-      "scannerType": "generic",
+      "scannerType": "trae",
       "enabled": false,
       "readOnly": true,
       "configDir": "~/.trae",
-      "skillsDir": "~/.trae/skills"
+      "skillsDir": "~/.trae/skills",
+      "mcpConfigFile": "~/AppData/Roaming/Trae/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
     }
   ]
 }
