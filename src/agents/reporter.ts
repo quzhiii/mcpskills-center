@@ -21,7 +21,8 @@ export function renderAgentDiscoveryMarkdown(report: AgentDiscoveryReport): stri
   ];
 
   for (const candidate of report.candidates) {
-    lines.push(`| ${escapeMarkdownTableCell(candidate.agentId)} | ${escapeMarkdownTableCell(candidate.displayName)} | ${candidate.status} | \`${escapeMarkdownTableCell(candidate.path)}\` | ${escapeMarkdownTableCell(candidate.reason)} |`);
+    const pathText = candidate.paths?.length ? candidate.paths.join(' ; ') : (candidate.path ?? '');
+    lines.push(`| ${escapeMarkdownTableCell(candidate.agentId)} | ${escapeMarkdownTableCell(candidate.displayName)} | ${candidate.status} | \`${escapeMarkdownTableCell(pathText)}\` | ${escapeMarkdownTableCell(candidate.reason)} |`);
   }
 
   lines.push('');

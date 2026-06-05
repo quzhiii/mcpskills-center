@@ -22,7 +22,8 @@ export interface AgentDiscoveryCandidate {
   agentId: string;
   displayName: string;
   status: AgentDiscoveryStatus;
-  path: string;
+  path?: string;
+  paths?: string[];
   reason: string;
 }
 
@@ -36,6 +37,8 @@ export interface AgentDiscoverySpec {
   displayName: string;
   relativePaths: string[];
   confirmFiles: string[];
+  confirmFilesByPath?: Record<string, string[]>;
+  manualReviewOnMultipleConfirmed?: boolean;
 }
 
 export interface Skill {

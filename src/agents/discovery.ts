@@ -11,7 +11,16 @@ export interface DiscoverAgentsOptions {
 
 export const DEFAULT_AGENT_DISCOVERY_SPECS: AgentDiscoverySpec[] = [
   { agentId: 'qoder', displayName: 'Qoder', relativePaths: ['.qoder', 'AppData/Roaming/Qoder', 'AppData/Local/Qoder', '.config/qoder'], confirmFiles: ['config.json', 'settings.json'] },
-  { agentId: 'qoder-work', displayName: 'Qoder Work', relativePaths: ['.qoder-work', 'AppData/Roaming/Qoder Work', 'AppData/Local/Qoder Work', '.config/qoder-work'], confirmFiles: ['config.json', 'settings.json'] },
+  {
+    agentId: 'qoder-work',
+    displayName: 'Qoder Work',
+    relativePaths: ['.qoderworkcn', '.qoder-work', 'AppData/Roaming/Qoder Work', 'AppData/Local/Qoder Work', '.config/qoder-work'],
+    confirmFiles: ['config.json', 'settings.json'],
+    confirmFilesByPath: {
+      '.qoderworkcn': ['.qoder.json'],
+    },
+    manualReviewOnMultipleConfirmed: true,
+  },
   { agentId: 'codebuddy', displayName: 'CodeBuddy', relativePaths: ['.codebuddy', 'AppData/Roaming/CodeBuddy', 'AppData/Local/CodeBuddy', '.config/codebuddy'], confirmFiles: ['config.json', 'settings.json'] },
   { agentId: 'workbuddy', displayName: 'WorkBuddy', relativePaths: ['.workbuddy', 'AppData/Roaming/WorkBuddy', 'AppData/Local/WorkBuddy', '.config/workbuddy'], confirmFiles: ['config.json', 'settings.json'] },
   { agentId: 'trae', displayName: 'Trae', relativePaths: ['.trae', 'AppData/Roaming/Trae', 'AppData/Local/Trae', '.config/trae'], confirmFiles: ['config.json', 'settings.json'] },
@@ -33,19 +42,58 @@ export async function discoverAgents(options: DiscoverAgentsOptions = {}): Promi
 }
 
 async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<AgentDiscoveryCandidate> {
-  const checkedPaths = roots.flatMap(root => spec.relativePaths.map(relativePath => join(root, relativePath)));
+  const checkedPaths = roots.flatMap(root => spec.relativePaths.map(relativePath => ({
+    relativePath,
+    candidatePath: join(root, relativePath),
+  })));
+  let firstCandidatePath: string | null = null;
+  const confirmedPaths: Array<{ path: string; confirmFile: string }> = [];
+  const ambiguousRelativePaths = new Set(['.qoderworkcn', '.qoder-work']);
 
-  for (const candidatePath of checkedPaths) {
+  for (const { relativePath, candidatePath } of checkedPaths) {
     if (!(await pathExists(candidatePath))) continue;
 
-    const foundConfirmFile = await findConfirmFile(candidatePath, spec.confirmFiles);
+    const confirmFiles = spec.confirmFilesByPath?.[relativePath] ?? spec.confirmFiles;
+    const foundConfirmFile = await findConfirmFile(candidatePath, confirmFiles);
     if (foundConfirmFile) {
+      if (!spec.manualReviewOnMultipleConfirmed) {
+        return {
+          agentId: spec.agentId,
+          displayName: spec.displayName,
+          status: 'confirmed',
+          path: candidatePath,
+          reason: `Found ${foundConfirmFile}`,
+        };
+      }
+
+      confirmedPaths.push({ path: candidatePath, confirmFile: foundConfirmFile });
+      continue;
+    }
+
+    firstCandidatePath ??= candidatePath;
+  }
+
+  if (confirmedPaths.length === 1) {
+    return {
+      agentId: spec.agentId,
+      displayName: spec.displayName,
+      status: 'confirmed',
+      path: confirmedPaths[0].path,
+      reason: `Found ${confirmedPaths[0].confirmFile}`,
+    };
+  }
+
+  if (confirmedPaths.length > 1) {
+    const shouldManualReview = spec.manualReviewOnMultipleConfirmed
+      && confirmedPaths.some(item => ambiguousRelativePaths.has(extractRelativePath(item.path, checkedPaths)));
+
+    if (!shouldManualReview) {
       return {
         agentId: spec.agentId,
         displayName: spec.displayName,
         status: 'confirmed',
-        path: candidatePath,
-        reason: `Found ${foundConfirmFile}`,
+        path: confirmedPaths[0].path,
+        reason: `Found ${confirmedPaths[0].confirmFile}`,
       };
     }
 
@@ -53,18 +101,28 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
       agentId: spec.agentId,
       displayName: spec.displayName,
       status: 'candidate',
-      path: candidatePath,
+      paths: confirmedPaths.map(item => item.path),
+      reason: 'Multiple known config roots were confirmed; manual review needed',
+    };
+  }
+
+  if (firstCandidatePath) {
+    return {
+      agentId: spec.agentId,
+      displayName: spec.displayName,
+      status: 'candidate',
+      path: firstCandidatePath,
       reason: 'Directory exists but no known config file was found',
     };
   }
 
-  return {
-    agentId: spec.agentId,
-    displayName: spec.displayName,
-    status: 'missing',
-    path: checkedPaths[0] ?? '',
-    reason: 'No known path exists',
-  };
+    return {
+      agentId: spec.agentId,
+      displayName: spec.displayName,
+      status: 'missing',
+      path: checkedPaths[0]?.candidatePath ?? '',
+      reason: 'No known path exists',
+    };
 }
 
 async function findConfirmFile(root: string, confirmFiles: string[]): Promise<string | null> {
@@ -82,4 +140,11 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function extractRelativePath(
+  candidatePath: string,
+  checkedPaths: Array<{ relativePath: string; candidatePath: string }>
+): string {
+  return checkedPaths.find(item => item.candidatePath === candidatePath)?.relativePath ?? '';
 }
