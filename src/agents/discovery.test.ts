@@ -213,6 +213,44 @@ test('discoverAgents confirms qoder from AppData root via nested User/settings.j
   assert.equal(candidate?.reason, 'Found User/settings.json');
 });
 
+test('discoverAgents confirms trae from AppData root via nested User/settings.json', async () => {
+  const root = await makeTempRoot();
+  const traeAppDataRoot = join(root, 'AppData', 'Roaming', 'Trae');
+
+  await mkdir(join(traeAppDataRoot, 'User'), { recursive: true });
+  await writeFile(join(traeAppDataRoot, 'User', 'settings.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'trae');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, traeAppDataRoot);
+  assert.equal(candidate?.reason, 'Found User/settings.json');
+});
+
+test('discoverAgents confirms trae from Local AppData root via nested User/settings.json', async () => {
+  const root = await makeTempRoot();
+  const traeLocalAppDataRoot = join(root, 'AppData', 'Local', 'Trae');
+
+  await mkdir(join(traeLocalAppDataRoot, 'User'), { recursive: true });
+  await writeFile(join(traeLocalAppDataRoot, 'User', 'settings.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'trae');
+
+  assert.equal(candidate?.status, 'confirmed');
+  assert.equal(candidate?.path, traeLocalAppDataRoot);
+  assert.equal(candidate?.reason, 'Found User/settings.json');
+});
+
 test('discoverAgents still confirms qoder from AppData root via top-level settings.json fallback', async () => {
   const root = await makeTempRoot();
   const qoderAppDataRoot = join(root, 'AppData', 'Roaming', 'Qoder');

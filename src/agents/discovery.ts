@@ -32,7 +32,16 @@ export const DEFAULT_AGENT_DISCOVERY_SPECS: AgentDiscoverySpec[] = [
   },
   { agentId: 'codebuddy', displayName: 'CodeBuddy', relativePaths: ['.codebuddy', 'AppData/Roaming/CodeBuddy', 'AppData/Local/CodeBuddy', '.config/codebuddy'], confirmFiles: ['config.json', 'settings.json'] },
   { agentId: 'workbuddy', displayName: 'WorkBuddy', relativePaths: ['.workbuddy', 'AppData/Roaming/WorkBuddy', 'AppData/Local/WorkBuddy', '.config/workbuddy'], confirmFiles: ['config.json', 'settings.json'] },
-  { agentId: 'trae', displayName: 'Trae', relativePaths: ['.trae', 'AppData/Roaming/Trae', 'AppData/Local/Trae', '.config/trae'], confirmFiles: ['config.json', 'settings.json'] },
+  {
+    agentId: 'trae',
+    displayName: 'Trae',
+    relativePaths: ['.trae', 'AppData/Roaming/Trae', 'AppData/Local/Trae', '.config/trae'],
+    confirmFiles: ['config.json', 'settings.json'],
+    confirmFilesByPath: {
+      'AppData/Roaming/Trae': ['User/settings.json'],
+      'AppData/Local/Trae': ['User/settings.json'],
+    },
+  },
 ];
 
 export async function discoverAgents(options: DiscoverAgentsOptions = {}): Promise<AgentDiscoveryReport> {

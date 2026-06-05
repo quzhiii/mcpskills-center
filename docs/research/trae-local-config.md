@@ -11,6 +11,7 @@
 - Home root: `~/.trae`
 - Skills root: `~/.trae/skills`
 - App argv/config stub: `~/.trae/argv.json`
+- VS Code-style app root: `%APPDATA%/Trae`
 - VS Code-style user config root: `%APPDATA%/Trae/User`
 - MCP candidate used for scanner v1: `%APPDATA%/Trae/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
@@ -21,6 +22,12 @@
 - `~/.trae/skills/<skill-id>/SKILL.md`
 
 Observed structure is a direct directory-per-skill layout.
+
+### Discovery
+
+- `~/.trae` is a useful home root for skills and argv/config stubs.
+- `%APPDATA%/Trae/User/settings.json` is a stronger discovery confirm file for the installed app root on this machine.
+- `AppData/Roaming/Trae` and `AppData/Local/Trae` are both treated with the same nested `User/settings.json` confirmation rule when those roots are present.
 
 ### MCP
 
