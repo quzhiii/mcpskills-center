@@ -95,7 +95,36 @@ test('renderHelp includes current commands', () => {
   assert.match(help, /sync --dry-run/);
   assert.match(help, /profile list/);
   assert.match(help, /agents list/);
+  assert.match(help, /matrix/);
   assert.match(help, /health/);
+});
+
+test('executeCommand handles matrix and writes reports', async () => {
+  const writes: string[] = [];
+  const output = await executeCommand(makeCli('matrix'), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => { writes.push('capability-matrix'); },
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Capability matrix complete!/);
+  assert.match(output, /Skill Capabilities: 1/);
+  assert.match(output, /MCP Capabilities: 1/);
+  assert.deepEqual(writes, ['capability-matrix']);
 });
 
 test('executeCommand handles agents list through injected registry', async () => {
@@ -110,6 +139,7 @@ test('executeCommand handles agents list through injected registry', async () =>
     runInventory: async () => makeInventory(),
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
@@ -136,6 +166,7 @@ test('executeCommand handles agents discover and writes reports', async () => {
     runInventory: async () => makeInventory(),
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({
@@ -168,6 +199,7 @@ test('executeCommand handles scan through injected dependencies', async () => {
     runInventory: async () => makeInventory(),
     writeAllReports: async () => { writes.push('all-reports'); },
     writeSyncPlanReports: async () => { writes.push('sync-plan'); },
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
@@ -192,6 +224,7 @@ test('executeCommand handles profile plan through injected dependencies', async 
     runInventory: async () => makeInventory(),
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
@@ -231,6 +264,7 @@ test('executeCommand handles sync apply through injected dependencies', async ()
     }),
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
@@ -270,6 +304,7 @@ test('executeCommand handles sync restore through injected dependencies', async 
     runInventory: async () => makeInventory(),
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => profiles,
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),

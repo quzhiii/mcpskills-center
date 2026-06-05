@@ -31,6 +31,12 @@ test('parseCliArgs parses agents list command', () => {
   assert.equal(parsed.options.subcommand, 'list');
 });
 
+test('parseCliArgs parses matrix command', () => {
+  const parsed = parseCliArgs(['matrix']);
+
+  assert.equal(parsed.command, 'matrix');
+});
+
 test('parseCliArgs parses active health check options', () => {
   const parsed = parseCliArgs(['health', '--active', '--allow-command', 'npx', '--timeout', '2500']);
 

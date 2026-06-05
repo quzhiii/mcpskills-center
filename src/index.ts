@@ -1,5 +1,6 @@
 import { runInventory } from './scanner/index.js';
 import { writeAllReports } from './dashboard/reporter.js';
+import { writeCapabilityMatrixReports } from './matrix/reporter.js';
 import { parseCliArgs } from './cli.js';
 import { applySyncPlan } from './sync/apply.js';
 import { writeSyncPlanReports } from './sync/reporter.js';
@@ -26,6 +27,7 @@ async function main() {
     runInventory: () => runInventory(agentRegistry.agents),
     writeAllReports,
     writeSyncPlanReports,
+    writeCapabilityMatrixReports,
     loadProfiles,
     listAgents: async () => agentRegistry.agents,
     discoverAgents,

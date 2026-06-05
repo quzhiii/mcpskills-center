@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
+import { buildCapabilityMatrix } from '../matrix/capability.js';
 import { normalizeInventory } from '../normalizer/index.js';
 import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
@@ -20,6 +21,7 @@ export interface CommandContext {
   runInventory: () => Promise<Inventory>;
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
+  writeCapabilityMatrixReports: (matrix: import('../types/index.js').CapabilityMatrix, reportsDir: string) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
   listAgents: () => Promise<AgentConfig[]>;
   discoverAgents: () => Promise<AgentDiscoveryReport>;
@@ -40,6 +42,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeProfile(cli, context);
     case 'agents':
       return executeAgents(cli, context);
+    case 'matrix':
+      return executeMatrix(context);
     case 'health':
       return executeHealth(cli, context);
     case 'help':
@@ -62,6 +66,7 @@ export function renderHelp(): string {
     '  profile plan <name>          Plan profile changes without writing',
     '  agents list                  List registered local agents',
     '  agents discover              Discover local agent config candidates',
+    '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
     '  help                         Show this help',
@@ -200,6 +205,21 @@ async function executeHealth(cli: CliArgs, context: CommandContext): Promise<str
   }
 
   return lines.join('\n');
+}
+
+async function executeMatrix(context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const matrix = buildCapabilityMatrix(normalized);
+  await context.writeCapabilityMatrixReports(matrix, context.reportsDir);
+
+  return [
+    'Capability matrix complete!',
+    `   Skill Capabilities: ${matrix.summary.totalSkillCapabilities}`,
+    `   MCP Capabilities: ${matrix.summary.totalMcpCapabilities}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+  ].join('\n');
 }
 
 async function executeAgents(cli: CliArgs, context: CommandContext): Promise<string> {

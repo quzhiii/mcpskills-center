@@ -92,6 +92,11 @@ node dist/index.js sync --dry-run
 - `reports/sync-plan-current.json`
 - `reports/sync-plan-current.md`
 
+`matrix` 会生成：
+
+- `reports/capability-matrix-current.json`
+- `reports/capability-matrix-current.md`
+
 `sync --apply --confirm` 会在 `backups/` 下写入带时间戳的备份目录，并生成一次 apply 对应的 consolidated manifest。
 
 ### Dashboard 预览
@@ -122,6 +127,7 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 | `node dist/index.js profile plan <name>` | 将 profile 与当前 inventory 对比 | 无 |
 | `node dist/index.js agents list` | 列出 `config/agents.json` 中注册的本地 agents | 无 |
 | `node dist/index.js agents discover` | 发现 Qoder、CodeBuddy、WorkBuddy、Trae 等本地 agent 配置候选路径 | `reports/` |
+| `node dist/index.js matrix` | 为已注册 agents 上发现的 skills 和 MCP servers 生成能力矩阵 | `reports/` |
 | `node dist/index.js health` | 执行被动 MCP 健康检查 | 无 |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | 对 allowlist 中的命令做显式主动探测 | 无 |
 | `node dist/index.js help` | 查看 CLI 帮助 | 无 |
@@ -202,7 +208,15 @@ node dist/index.js agents discover
 
 Discovery 是只读操作。它会检查常见本地路径，并写出 `reports/agent-discovery-current.json` 与 `reports/agent-discovery-current.md`。
 
-### 9. 先做安全的被动 MCP 健康检查
+### 9. 查看当前 inventory 的跨 agent 能力矩阵
+
+```bash
+node dist/index.js matrix
+```
+
+适合在当前 inventory 之上快速看到哪些 skill 和 MCP 能力分布在多个 agent 上、哪些 agent 缺失对应能力，以及共享能力数量。它会写出 `reports/capability-matrix-current.json` 与 `reports/capability-matrix-current.md`。
+
+### 10. 先做安全的被动 MCP 健康检查
 
 ```bash
 node dist/index.js health
@@ -210,7 +224,7 @@ node dist/index.js health
 
 被动模式不会启动命令，只检查 transport 形态、command 是否存在、URL 是否有效、敏感 env key 风险等。
 
-### 10. 对 allowlist 命令做显式主动探测
+### 11. 对 allowlist 命令做显式主动探测
 
 ```bash
 node dist/index.js health --active --allow-command npx --timeout 3000

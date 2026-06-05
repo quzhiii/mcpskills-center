@@ -159,3 +159,27 @@ export interface ProfilePlanAction {
   reason: string;
   requiresWrite: boolean;
 }
+
+export type CapabilityPresence = 'present' | 'missing';
+
+export interface CapabilityMatrixRow {
+  capabilityId: string;
+  capabilityType: 'skill' | 'mcp-server';
+  presentAgents: string[];
+  missingAgents: string[];
+  agentStates: Record<string, CapabilityPresence>;
+  isShared: boolean;
+}
+
+export interface CapabilityMatrix {
+  generatedAt: string;
+  agents: string[];
+  skills: CapabilityMatrixRow[];
+  mcpServers: CapabilityMatrixRow[];
+  summary: {
+    totalSkillCapabilities: number;
+    totalMcpCapabilities: number;
+    sharedSkills: number;
+    sharedMcps: number;
+  };
+}
