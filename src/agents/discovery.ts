@@ -68,7 +68,6 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
   })));
   let firstCandidatePath: string | null = null;
   const confirmedPaths: Array<{ path: string; confirmFile: string }> = [];
-  const ambiguousRelativePaths = new Set(['.qoderworkcn', '.qoder-work']);
 
   for (const { relativePath, candidatePath } of checkedPaths) {
     if (!(await pathExists(candidatePath))) continue;
@@ -107,8 +106,7 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
   }
 
   if (confirmedPaths.length > 1) {
-    const shouldManualReview = spec.manualReviewOnMultipleConfirmed
-      && confirmedPaths.some(item => ambiguousRelativePaths.has(extractRelativePath(item.path, checkedPaths)));
+    const shouldManualReview = spec.manualReviewOnMultipleConfirmed === true;
 
     if (!shouldManualReview) {
       return {
@@ -167,11 +165,4 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function extractRelativePath(
-  candidatePath: string,
-  checkedPaths: Array<{ relativePath: string; candidatePath: string }>
-): string {
-  return checkedPaths.find(item => item.candidatePath === candidatePath)?.relativePath ?? '';
 }

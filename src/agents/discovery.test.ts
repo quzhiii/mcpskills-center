@@ -313,3 +313,26 @@ test('discoverAgents marks qoder-work as candidate when home and AppData roots a
   assert.deepEqual(candidate?.paths, [qoderWorkCnRoot, qoderWorkCnAppDataRoot]);
   assert.equal(candidate?.reason, 'Multiple known config roots were confirmed; manual review needed');
 });
+
+test('discoverAgents marks qoder-work as candidate when multiple AppData roots are confirmed', async () => {
+  const root = await makeTempRoot();
+  const roamingQoderWorkCnRoot = join(root, 'AppData', 'Roaming', 'QoderWork CN');
+  const roamingQoderWorkRoot = join(root, 'AppData', 'Roaming', 'Qoder Work');
+
+  await mkdir(roamingQoderWorkCnRoot, { recursive: true });
+  await mkdir(roamingQoderWorkRoot, { recursive: true });
+  await writeFile(join(roamingQoderWorkCnRoot, '.builtin-defaults-state-v3.json'), '{}', 'utf-8');
+  await writeFile(join(roamingQoderWorkRoot, 'settings.json'), '{}', 'utf-8');
+
+  const report = await discoverAgents({
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    roots: [root],
+  });
+
+  const candidate = report.candidates.find(item => item.agentId === 'qoder-work');
+
+  assert.equal(candidate?.status, 'candidate');
+  assert.equal(candidate?.path, undefined);
+  assert.deepEqual(candidate?.paths, [roamingQoderWorkCnRoot, roamingQoderWorkRoot]);
+  assert.equal(candidate?.reason, 'Multiple known config roots were confirmed; manual review needed');
+});

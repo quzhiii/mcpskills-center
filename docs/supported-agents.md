@@ -109,11 +109,14 @@ Current release policy:
   - `~/.qoderworkcn`
   - `~/.qoder-work`
   - `%APPDATA%/QoderWork CN`
+  - `%APPDATA%/Qoder Work`
+  - `%LOCALAPPDATA%/Qoder Work`
 - Current level: Generic read-only placeholder
 - Notes:
   - Skills root is clear enough for generic read-only scanning.
   - `cache/mcp/market.json` looks like connector catalog metadata, not active enablement state.
   - `%APPDATA%/QoderWork CN/data/agents.db` contains MCP-adjacent schema but did not prove active MCP enablement on this machine.
+  - When multiple independently confirmed roots are found, discovery intentionally falls back to manual review instead of guessing the active install.
   - Dedicated MCP parsing remains deferred.
 
 ## Confidence Guide
