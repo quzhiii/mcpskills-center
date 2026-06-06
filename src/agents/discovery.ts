@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { describeAgentSupport } from './support.js';
 import type { AgentDiscoveryCandidate, AgentDiscoveryReport, AgentDiscoverySpec } from '../types/index.js';
 
 export interface DiscoverAgentsOptions {
@@ -60,6 +61,7 @@ export async function discoverAgents(options: DiscoverAgentsOptions = {}): Promi
 }
 
 async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<AgentDiscoveryCandidate> {
+  const support = describeAgentSupport(spec.agentId);
   const checkedPaths = roots.flatMap(root => spec.relativePaths.map(relativePath => ({
     relativePath,
     candidatePath: join(root, relativePath),
@@ -82,6 +84,7 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
           status: 'confirmed',
           path: candidatePath,
           reason: `Found ${foundConfirmFile}`,
+          support,
         };
       }
 
@@ -99,6 +102,7 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
       status: 'confirmed',
       path: confirmedPaths[0].path,
       reason: `Found ${confirmedPaths[0].confirmFile}`,
+      support,
     };
   }
 
@@ -113,6 +117,7 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
         status: 'confirmed',
         path: confirmedPaths[0].path,
         reason: `Found ${confirmedPaths[0].confirmFile}`,
+        support,
       };
     }
 
@@ -122,6 +127,7 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
       status: 'candidate',
       paths: confirmedPaths.map(item => item.path),
       reason: 'Multiple known config roots were confirmed; manual review needed',
+      support,
     };
   }
 
@@ -132,16 +138,18 @@ async function discoverSpec(spec: AgentDiscoverySpec, roots: string[]): Promise<
       status: 'candidate',
       path: firstCandidatePath,
       reason: 'Directory exists but no known config file was found',
+      support,
     };
   }
 
-    return {
-      agentId: spec.agentId,
-      displayName: spec.displayName,
-      status: 'missing',
-      path: checkedPaths[0]?.candidatePath ?? '',
-      reason: 'No known path exists',
-    };
+  return {
+    agentId: spec.agentId,
+    displayName: spec.displayName,
+    status: 'missing',
+    path: checkedPaths[0]?.candidatePath ?? '',
+    reason: 'No known path exists',
+    support,
+  };
 }
 
 async function findConfirmFile(root: string, confirmFiles: string[]): Promise<string | null> {

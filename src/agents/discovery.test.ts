@@ -59,6 +59,8 @@ test('discoverAgents confirms qoder-work from observed qoderworkcn root', async 
   assert.equal(candidate?.status, 'confirmed');
   assert.equal(candidate?.path, qoderWorkRoot);
   assert.equal(candidate?.reason, 'Found .qoder.json');
+  assert.equal(candidate?.support?.currentLevel, 'generic read-only placeholder');
+  assert.equal(candidate?.support?.sourceOfTruthConfidence, 'low');
 });
 
 test('discoverAgents continues past unconfirmed qoderworkcn root to confirmed legacy qoder-work root', async () => {

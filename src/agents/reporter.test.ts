@@ -25,6 +25,10 @@ test('writeAgentDiscoveryReports writes JSON and Markdown reports', async () => 
         status: 'confirmed',
         path: 'C:/Users/example/.qoder',
         reason: 'Found config.json',
+        support: {
+          currentLevel: 'generic read-only placeholder',
+          sourceOfTruthConfidence: 'low',
+        },
       },
       {
         agentId: 'trae',
@@ -32,6 +36,10 @@ test('writeAgentDiscoveryReports writes JSON and Markdown reports', async () => 
         status: 'missing',
         path: 'C:/Users/example/.trae',
         reason: 'No known path exists',
+        support: {
+          currentLevel: 'dedicated read-only',
+          sourceOfTruthConfidence: 'low',
+        },
       },
     ],
   };
@@ -42,8 +50,10 @@ test('writeAgentDiscoveryReports writes JSON and Markdown reports', async () => 
   const markdown = await readFile(join(root, 'agent-discovery-current.md'), 'utf-8');
 
   assert.equal(json.candidates.length, 2);
+  assert.equal(json.candidates[0].support?.currentLevel, 'generic read-only placeholder');
+  assert.equal(json.candidates[0].support?.sourceOfTruthConfidence, 'low');
   assert.match(markdown, /# Agent Discovery Report/);
-  assert.match(markdown, /\| qoder \| Qoder \| confirmed \| `C:\/Users\/example\/.qoder` \| Found config.json \|/);
+  assert.match(markdown, /\| qoder \| Qoder \| confirmed \| generic read-only placeholder \| low \| `C:\/Users\/example\/.qoder` \| Found config.json \|/);
 });
 
 test('writeAgentDiscoveryReports renders all ambiguous discovery paths in Markdown', async () => {
@@ -60,6 +70,10 @@ test('writeAgentDiscoveryReports renders all ambiguous discovery paths in Markdo
         path: 'C:/Users/example/.qoderworkcn',
         paths: ['C:/Users/example/.qoderworkcn', 'C:/Users/example/.qoder-work'],
         reason: 'Multiple known config roots were confirmed; manual review needed',
+        support: {
+          currentLevel: 'generic read-only placeholder',
+          sourceOfTruthConfidence: 'low',
+        },
       },
     ],
   };
@@ -69,4 +83,5 @@ test('writeAgentDiscoveryReports renders all ambiguous discovery paths in Markdo
   const markdown = await readFile(join(root, 'agent-discovery-current.md'), 'utf-8');
 
   assert.match(markdown, /`C:\/Users\/example\/.qoderworkcn ; C:\/Users\/example\/.qoder-work`/);
+  assert.match(markdown, /\| qoder-work \| Qoder Work \| candidate \| generic read-only placeholder \| low \|/);
 });

@@ -16,13 +16,13 @@ export function renderAgentDiscoveryMarkdown(report: AgentDiscoveryReport): stri
     '',
     `Generated: ${report.generatedAt}`,
     '',
-    '| Agent | Display Name | Status | Path | Reason |',
-    '|---|---|---|---|---|',
+    '| Agent | Display Name | Status | Support | Source-of-Truth Confidence | Path | Reason |',
+    '|---|---|---|---|---|---|---|',
   ];
 
   for (const candidate of report.candidates) {
     const pathText = candidate.paths?.length ? candidate.paths.join(' ; ') : (candidate.path ?? '');
-    lines.push(`| ${escapeMarkdownTableCell(candidate.agentId)} | ${escapeMarkdownTableCell(candidate.displayName)} | ${candidate.status} | \`${escapeMarkdownTableCell(pathText)}\` | ${escapeMarkdownTableCell(candidate.reason)} |`);
+    lines.push(`| ${escapeMarkdownTableCell(candidate.agentId)} | ${escapeMarkdownTableCell(candidate.displayName)} | ${candidate.status} | ${escapeMarkdownTableCell(candidate.support?.currentLevel ?? '')} | ${escapeMarkdownTableCell(candidate.support?.sourceOfTruthConfidence ?? '')} | \`${escapeMarkdownTableCell(pathText)}\` | ${escapeMarkdownTableCell(candidate.reason)} |`);
   }
 
   lines.push('');

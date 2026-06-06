@@ -1,3 +1,5 @@
+import type { AgentSupportMetadata } from '../agents/support.js';
+
 export interface AgentConfig {
   name: string;
   id?: string;
@@ -25,6 +27,7 @@ export interface AgentDiscoveryCandidate {
   path?: string;
   paths?: string[];
   reason: string;
+  support?: AgentSupportMetadata;
 }
 
 export interface AgentDiscoveryReport {
