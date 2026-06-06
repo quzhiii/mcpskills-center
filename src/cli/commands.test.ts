@@ -149,8 +149,43 @@ test('executeCommand handles agents list through injected registry', async () =>
   });
 
   assert.match(output, /Registered agents:/);
-  assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable, support: dedicated read-only plus write-ready workflow support, source-of-truth: high\]/);
-  assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only, support: generic read-only placeholder, source-of-truth: low\]/);
+  assert.match(output, /claude-code - Claude Code \[scanner: claude-code, enabled, write-capable, support: dedicated read-only plus write-ready workflow support, source-of-truth-confidence: high\]/);
+  assert.match(output, /qoder - Qoder \[scanner: generic, disabled, read-only, support: generic read-only placeholder, source-of-truth-confidence: low\]/);
+});
+
+test('executeCommand handles agents list with undocumented support fallback', async () => {
+  const output = await executeCommand(makeCli('agents', { subcommand: 'list' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => [
+      {
+        name: 'future-agent',
+        id: 'future-agent',
+        displayName: 'Future Agent',
+        scannerType: 'future',
+        enabled: false,
+        readOnly: true,
+        configDir: 'C:/future',
+        skillsDir: 'C:/future/skills',
+      },
+    ],
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /future-agent - Future Agent \[scanner: future, disabled, read-only, support: undocumented\/unknown, source-of-truth-confidence: low\]/);
 });
 
 test('executeCommand handles agents discover and writes reports', async () => {

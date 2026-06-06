@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
 import { buildCapabilityMatrix } from '../matrix/capability.js';
@@ -232,7 +233,7 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
         'Registered agents:',
         ...agents.map(agent => {
           const support = describeAgentSupport(agent.id ?? agent.name);
-          return `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}, support: ${support.level}, source-of-truth: ${support.confidence}]`;
+          return `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}, support: ${support.currentLevel}, source-of-truth-confidence: ${support.sourceOfTruthConfidence}]`;
         }),
       ].join('\n');
     }
@@ -248,24 +249,6 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
     }
     default:
       return 'Usage: node dist/index.js agents [list|discover]';
-  }
-}
-
-function describeAgentSupport(agentId: string): { level: string; confidence: 'high' | 'medium' | 'low' } {
-  switch (agentId) {
-    case 'claude-code':
-    case 'opencode':
-    case 'codex':
-      return { level: 'dedicated read-only plus write-ready workflow support', confidence: 'high' };
-    case 'codebuddy':
-    case 'workbuddy':
-    case 'trae':
-      return { level: 'dedicated read-only', confidence: agentId === 'trae' ? 'low' : 'medium' };
-    case 'qoder':
-    case 'qoder-work':
-      return { level: 'generic read-only placeholder', confidence: 'low' };
-    default:
-      return { level: 'generic read-only placeholder', confidence: 'low' };
   }
 }
 
