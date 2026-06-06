@@ -1,28 +1,33 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { renderDashboardHtml } from './html.js';
+import { describeAgentSupport } from '../agents/support.js';
 import type { Inventory, AuditReport } from '../types/index.js';
 
 export async function writeInventoryJson(inventory: Inventory, outPath: string): Promise<void> {
+  const enrichedInventory = withAgentSupport(inventory);
   await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, JSON.stringify(inventory, null, 2), 'utf-8');
+  await writeFile(outPath, JSON.stringify(enrichedInventory, null, 2), 'utf-8');
 }
 
 export async function writeInventoryMarkdown(inventory: Inventory, outPath: string): Promise<void> {
+  const enrichedInventory = withAgentSupport(inventory);
   const lines: string[] = [];
   lines.push('# MCP/skills Inventory Report');
   lines.push('');
-  lines.push(`Generated: ${inventory.generatedAt}`);
+  lines.push(`Generated: ${enrichedInventory.generatedAt}`);
   lines.push('');
 
   // Agents
   lines.push('## Agents');
   lines.push('');
-  for (const agent of inventory.agents) {
+  for (const agent of enrichedInventory.agents) {
     lines.push(`- **${agent.name}**`);
     lines.push(`  - Config: \`${agent.configDir}\``);
     lines.push(`  - Skills: \`${agent.skillsDir}\``);
     if (agent.mcpConfigFile) lines.push(`  - MCP: \`${agent.mcpConfigFile}\``);
+    if (agent.support) lines.push(`  - Support: \`${agent.support.currentLevel}\``);
+    if (agent.support) lines.push(`  - Source-of-Truth Confidence: \`${agent.support.sourceOfTruthConfidence}\``);
   }
   lines.push('');
 
@@ -55,6 +60,16 @@ export async function writeInventoryMarkdown(inventory: Inventory, outPath: stri
 
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, lines.join('\n'), 'utf-8');
+}
+
+function withAgentSupport(inventory: Inventory): Inventory {
+  return {
+    ...inventory,
+    agents: inventory.agents.map(agent => ({
+      ...agent,
+      support: agent.support ?? describeAgentSupport(agent.id ?? agent.name),
+    })),
+  };
 }
 
 export async function writeAuditMarkdown(report: AuditReport, outPath: string): Promise<void> {

@@ -12,6 +12,7 @@ export interface AgentConfig {
   skillsDir: string;
   mcpConfigFile?: string;
   pluginsDir?: string;
+  support?: AgentSupportMetadata;
 }
 
 export interface AgentRegistry {
