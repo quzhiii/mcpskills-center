@@ -1,3 +1,5 @@
+import type { AgentConfig } from '../types/index.js';
+
 export type AgentSupportConfidence = 'high' | 'medium' | 'low';
 
 export interface AgentSupportMetadata {
@@ -28,4 +30,13 @@ export function getAgentSupportMap(): ReadonlyMap<string, AgentSupportMetadata> 
 export function describeAgentSupport(agentId: string): AgentSupportMetadata {
   const metadata = AGENT_SUPPORT_MAP.get(agentId) ?? DEFAULT_SUPPORT;
   return { ...metadata };
+}
+
+export function resolveAgentSupport(agent: Pick<AgentConfig, 'id' | 'scannerType' | 'name'>): AgentSupportMetadata {
+  const supportKey =
+    (agent.scannerType && AGENT_SUPPORT_MAP.has(agent.scannerType) ? agent.scannerType : undefined)
+    ?? (agent.id && AGENT_SUPPORT_MAP.has(agent.id) ? agent.id : undefined)
+    ?? agent.name;
+
+  return describeAgentSupport(supportKey);
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeAgentSupport, getAgentSupportMap } from './support.js';
+import { describeAgentSupport, getAgentSupportMap, resolveAgentSupport } from './support.js';
 
 test('describeAgentSupport returns documented support metadata for baseline and research agents', () => {
   assert.deepEqual(describeAgentSupport('claude-code'), {
@@ -57,4 +57,26 @@ test('support metadata accessors return defensive copies', () => {
   mapped.currentLevel = 'mutated-again';
 
   assert.equal(describeAgentSupport('claude-code').currentLevel, 'dedicated read-only plus write-ready workflow support');
+});
+
+test('resolveAgentSupport prefers scannerType over custom id', () => {
+  assert.deepEqual(resolveAgentSupport({
+    id: 'custom-claude-install',
+    scannerType: 'claude-code',
+    name: 'custom-claude-install',
+  }), {
+    currentLevel: 'dedicated read-only plus write-ready workflow support',
+    sourceOfTruthConfidence: 'high',
+  });
+});
+
+test('resolveAgentSupport prefers known agent id over generic scanner type', () => {
+  assert.deepEqual(resolveAgentSupport({
+    id: 'qoder',
+    scannerType: 'generic',
+    name: 'qoder',
+  }), {
+    currentLevel: 'generic read-only placeholder',
+    sourceOfTruthConfidence: 'low',
+  });
 });

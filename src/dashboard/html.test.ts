@@ -102,3 +102,78 @@ test('renderDashboardHtml escapes dynamic strings and stays offline', () => {
   assert.doesNotMatch(html, /<link\s/i);
   assert.doesNotMatch(html, /src=/i);
 });
+
+test('renderDashboardHtml fills agent support fallback metadata on direct render', () => {
+  const inventory: Inventory = {
+    generatedAt: '2026-06-03T00:00:00.000Z',
+    agents: [
+      {
+        name: 'future-agent',
+        id: 'future-agent',
+        scannerType: 'future',
+        configDir: 'C:/future',
+        skillsDir: 'C:/future/skills',
+        enabled: false,
+        readOnly: true,
+      },
+    ],
+    skills: [],
+    mcpServers: [],
+    profiles: [],
+  };
+
+  const html = renderDashboardHtml(inventory, makeAudit(inventory));
+
+  assert.match(html, /Agent Support/);
+  assert.match(html, /undocumented\/unknown/);
+  assert.match(html, /low/);
+});
+
+test('renderDashboardHtml uses scannerType for support fallback when id is absent', () => {
+  const inventory: Inventory = {
+    generatedAt: '2026-06-03T00:00:00.000Z',
+    agents: [
+      {
+        name: 'custom-claude-install',
+        scannerType: 'claude-code',
+        configDir: 'C:/custom-claude',
+        skillsDir: 'C:/custom-claude/skills',
+        enabled: true,
+        readOnly: false,
+      },
+    ],
+    skills: [],
+    mcpServers: [],
+    profiles: [],
+  };
+
+  const html = renderDashboardHtml(inventory, makeAudit(inventory));
+
+  assert.match(html, /dedicated read-only plus write-ready workflow support/);
+  assert.match(html, /high/);
+});
+
+test('renderDashboardHtml prefers scannerType over custom id for support fallback', () => {
+  const inventory: Inventory = {
+    generatedAt: '2026-06-03T00:00:00.000Z',
+    agents: [
+      {
+        name: 'custom-claude-install',
+        id: 'custom-claude-install',
+        scannerType: 'claude-code',
+        configDir: 'C:/custom-claude',
+        skillsDir: 'C:/custom-claude/skills',
+        enabled: true,
+        readOnly: false,
+      },
+    ],
+    skills: [],
+    mcpServers: [],
+    profiles: [],
+  };
+
+  const html = renderDashboardHtml(inventory, makeAudit(inventory));
+
+  assert.match(html, /dedicated read-only plus write-ready workflow support/);
+  assert.match(html, /high/);
+});

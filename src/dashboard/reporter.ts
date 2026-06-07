@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { renderDashboardHtml } from './html.js';
-import { describeAgentSupport } from '../agents/support.js';
+import { resolveAgentSupport } from '../agents/support.js';
 import type { Inventory, AuditReport } from '../types/index.js';
 
 export async function writeInventoryJson(inventory: Inventory, outPath: string): Promise<void> {
@@ -34,11 +34,11 @@ export async function writeInventoryMarkdown(inventory: Inventory, outPath: stri
   // Skills
   lines.push('## Skills');
   lines.push('');
-  lines.push(`Total: ${inventory.skills.length}`);
+  lines.push(`Total: ${enrichedInventory.skills.length}`);
   lines.push('');
   lines.push('| Skill | Agents | Has SKILL.md | Frontmatter | Symlink |');
   lines.push('|-------|--------|--------------|-------------|---------|');
-  for (const skill of inventory.skills.sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const skill of [...enrichedInventory.skills].sort((a, b) => a.id.localeCompare(b.id))) {
     const agents = skill.agentInstallPaths.map(p => p.includes('claude') ? 'CC' : p.includes('opencode') ? 'OC' : p.includes('codex') ? 'CD' : '?').join(', ');
     lines.push(`| ${skill.id} | ${agents} | ${skill.hasSkillMd ? '✅' : '❌'} | ${skill.frontmatterValid ? '✅' : '❌'} | ${skill.isSymlink ? '🔗' : ''} |`);
   }
@@ -47,11 +47,11 @@ export async function writeInventoryMarkdown(inventory: Inventory, outPath: stri
   // MCP Servers
   lines.push('## MCP Servers');
   lines.push('');
-  lines.push(`Total: ${inventory.mcpServers.length}`);
+  lines.push(`Total: ${enrichedInventory.mcpServers.length}`);
   lines.push('');
   lines.push('| Server | Agents | Transport | Command | Sensitive Env |');
   lines.push('|--------|--------|-----------|---------|---------------|');
-  for (const mcp of inventory.mcpServers.sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const mcp of [...enrichedInventory.mcpServers].sort((a, b) => a.id.localeCompare(b.id))) {
     const agents = mcp.agentSources.map(s => s === 'claude-code' ? 'CC' : s === 'opencode' ? 'OC' : s === 'codex' ? 'CD' : '?').join(', ');
     const cmd = mcp.command ? mcp.command.split(' ')[0] : '-';
     lines.push(`| ${mcp.id} | ${agents} | ${mcp.transport} | \`${cmd}\` | ${mcp.hasSensitiveEnv ? '⚠️' : ''} |`);
@@ -67,7 +67,7 @@ function withAgentSupport(inventory: Inventory): Inventory {
     ...inventory,
     agents: inventory.agents.map(agent => ({
       ...agent,
-      support: agent.support ?? describeAgentSupport(agent.id ?? agent.name),
+      support: resolveAgentSupport(agent),
     })),
   };
 }
@@ -147,15 +147,17 @@ function escapeMarkdownTableCell(value: string): string {
 }
 
 export async function writeAllReports(inventory: Inventory, audit: AuditReport, baseDir: string): Promise<void> {
+  const enrichedInventory = withAgentSupport(inventory);
   await Promise.all([
-    writeInventoryJson(inventory, join(baseDir, 'inventory-current.json')),
-    writeInventoryMarkdown(inventory, join(baseDir, 'inventory-current.md')),
+    writeInventoryJson(enrichedInventory, join(baseDir, 'inventory-current.json')),
+    writeInventoryMarkdown(enrichedInventory, join(baseDir, 'inventory-current.md')),
     writeAuditMarkdown(audit, join(baseDir, 'audit-current.md')),
-    writeDashboardHtml(inventory, audit, join(baseDir, 'dashboard.html')),
+    writeDashboardHtml(enrichedInventory, audit, join(baseDir, 'dashboard.html')),
   ]);
 }
 
 export async function writeDashboardHtml(inventory: Inventory, audit: AuditReport, outPath: string): Promise<void> {
+  const enrichedInventory = withAgentSupport(inventory);
   await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, renderDashboardHtml(inventory, audit), 'utf-8');
+  await writeFile(outPath, renderDashboardHtml(enrichedInventory, audit), 'utf-8');
 }

@@ -1,9 +1,11 @@
+import { resolveAgentSupport } from '../agents/support.js';
 import type { AuditReport, Inventory } from '../types/index.js';
 
 export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): string {
   const recommendations = audit.recommendations.slice(0, 20);
   const issues = audit.issues.slice(0, 20);
   const skills = inventory.skills.slice(0, 20);
+  const agents = inventory.agents.slice(0, 20);
 
   return `<!doctype html>
 <html lang="en">
@@ -56,6 +58,11 @@ export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): s
     </section>
 
     <section class="card">
+      <h2>Agent Support</h2>
+      ${renderAgentSupportTable(agents)}
+    </section>
+
+    <section class="card">
       <h2>Skills</h2>
       ${renderSkillsTable(skills)}
     </section>
@@ -86,6 +93,24 @@ function renderSkillsTable(skills: Inventory['skills']): string {
 
   return `<table>
     <thead><tr><th>Skill</th><th>Installs</th><th>SKILL.md</th><th>Frontmatter</th></tr></thead>
+    <tbody>${rows}
+    </tbody>
+  </table>`;
+}
+
+function renderAgentSupportTable(agents: Inventory['agents']): string {
+  if (agents.length === 0) return '<p>No agents found.</p>';
+
+  const rows = agents.map(agent => `
+    <tr>
+      <td>${escapeHtml(agent.id ?? agent.name)}</td>
+      <td>${escapeHtml(agent.scannerType ?? agent.name)}</td>
+      <td>${escapeHtml(resolveAgentSupport(agent).currentLevel)}</td>
+      <td>${escapeHtml(resolveAgentSupport(agent).sourceOfTruthConfidence)}</td>
+    </tr>`).join('');
+
+  return `<table>
+    <thead><tr><th>Agent</th><th>Scanner</th><th>Support</th><th>Source-of-Truth Confidence</th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
