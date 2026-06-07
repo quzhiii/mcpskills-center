@@ -12,7 +12,7 @@
 
 [中文文档](README.zh-CN.md) · **English**
 
-[Quickstart](#quickstart) · [Outputs](#outputs) · [Commands](#commands) · [Scenarios](#scenarios) · [Profiles](#profiles) · [Safety](#safety-model) · [Boundaries](#boundaries)
+[Quickstart](#quickstart) · [Outputs](#outputs) · [Commands](#commands) · [Scenarios](#scenarios) · [Supported Agents](docs/supported-agents.md) · [Profiles](#profiles) · [Safety](#safety-model) · [Boundaries](#boundaries)
 
 </div>
 

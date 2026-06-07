@@ -12,7 +12,7 @@
 
 **中文** · [English](README.md)
 
-[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
+[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [支持的 Agents](docs/supported-agents.zh-CN.md) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
 
 </div>
 
@@ -46,7 +46,7 @@ Codex 配置 ───────┘                      │
 | Health 检查 | 默认被动检查，显式 allowlist 后才做主动命令探测 |
 | Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
 
-各 agent 当前支持状态可见 `docs/supported-agents.md`。
+各 agent 当前支持状态可见 `docs/supported-agents.zh-CN.md`。
 
 ---
 
