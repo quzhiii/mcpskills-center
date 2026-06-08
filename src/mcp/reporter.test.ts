@@ -22,6 +22,7 @@ function makePlan(): McpGovernancePlan {
         mcpId: 'filesystem',
         agentNames: ['claude-code', 'opencode'],
         canonicalAgentName: 'claude-code',
+        envRiskPolicy: 'no-env-risk-detected',
         definitions: [
           {
             agentName: 'claude-code',
@@ -48,6 +49,7 @@ function makePlan(): McpGovernancePlan {
         type: 'manual-review',
         mcpId: 'memory',
         agentNames: ['claude-code', 'codex'],
+        envRiskPolicy: 'no-env-risk-detected',
         definitions: [
           {
             agentName: 'claude-code',
@@ -74,6 +76,7 @@ function makePlan(): McpGovernancePlan {
         type: 'skip',
         mcpId: 'single',
         agentNames: ['opencode'],
+        envRiskPolicy: 'no-env-risk-detected',
         definitions: [
           {
             agentName: 'opencode',

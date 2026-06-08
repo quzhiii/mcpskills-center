@@ -93,10 +93,13 @@ export interface McpGovernanceAction {
   agentNames: string[];
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpCanonicalProfileCandidate;
+  envRiskPolicy: McpEnvRiskPolicy;
   definitions?: MCPServerDefinition[];
   reason: string;
   requiresWrite: false;
 }
+
+export type McpEnvRiskPolicy = 'no-env-risk-detected' | 'sensitive-env-blocks-canonicalization' | 'unknown-transport-requires-review';
 
 export interface McpCanonicalProfileCandidate {
   profileId: string;

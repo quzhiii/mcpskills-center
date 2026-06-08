@@ -14,7 +14,21 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        envRiskPolicy: classifyEnvRiskPolicy(definitions),
         reason: 'MCP server is configured in only one agent; no governance action is needed',
+      }));
+      continue;
+    }
+
+    if (hasUnknownTransport(definitions)) {
+      actions.push(createAction({
+        index: actions.length,
+        type: 'manual-review',
+        mcp,
+        definitions,
+        agentNames,
+        envRiskPolicy: 'unknown-transport-requires-review',
+        reason: 'MCP server has unknown transport and must be reviewed before canonicalization',
       }));
       continue;
     }
@@ -26,6 +40,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        envRiskPolicy: 'sensitive-env-blocks-canonicalization',
         reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
       }));
       continue;
@@ -38,6 +53,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        envRiskPolicy: classifyEnvRiskPolicy(definitions),
         reason: 'MCP duplicate definitions drift across agents and require manual review',
       }));
       continue;
@@ -51,6 +67,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
       agentNames,
       canonicalAgentName: agentNames[0],
       canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, definitions, agentNames),
+      envRiskPolicy: 'no-env-risk-detected',
       reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
     }));
   }
@@ -69,6 +86,7 @@ function createAction(args: {
   agentNames: string[];
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpGovernanceAction['canonicalProfileCandidate'];
+  envRiskPolicy: McpGovernanceAction['envRiskPolicy'];
   reason: string;
 }): McpGovernanceAction {
   return {
@@ -78,6 +96,7 @@ function createAction(args: {
     agentNames: args.agentNames,
     canonicalAgentName: args.canonicalAgentName,
     canonicalProfileCandidate: args.canonicalProfileCandidate,
+    envRiskPolicy: args.envRiskPolicy,
     definitions: args.definitions,
     reason: args.reason,
     requiresWrite: false,
@@ -117,6 +136,16 @@ function normalizeDefinition(definition: MCPServerDefinition): string {
 
 function hasSensitiveEnvDriftRisk(definitions: MCPServerDefinition[]): boolean {
   return definitions.some(definition => definition.hasSensitiveEnv);
+}
+
+function hasUnknownTransport(definitions: MCPServerDefinition[]): boolean {
+  return definitions.some(definition => definition.transport === 'unknown');
+}
+
+function classifyEnvRiskPolicy(definitions: MCPServerDefinition[]): McpGovernanceAction['envRiskPolicy'] {
+  if (hasUnknownTransport(definitions)) return 'unknown-transport-requires-review';
+  if (hasSensitiveEnvDriftRisk(definitions)) return 'sensitive-env-blocks-canonicalization';
+  return 'no-env-risk-detected';
 }
 
 function createCanonicalProfileCandidate(

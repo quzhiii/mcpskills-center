@@ -60,6 +60,7 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
   assert.equal(plan.actions[0].mcpId, 'filesystem');
   assert.deepEqual(plan.actions[0].agentNames, ['claude-code', 'opencode']);
   assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
+  assert.equal(plan.actions[0].envRiskPolicy, 'no-env-risk-detected');
   assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
     profileId: 'filesystem',
     mcpId: 'filesystem',
@@ -121,4 +122,53 @@ test('planMcpGovernance sends drifted duplicate definitions to manual review wit
   assert.deepEqual(plan.actions[0].definitions?.map(definition => definition.command), ['npx', 'node']);
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /drift/i);
+});
+
+test('planMcpGovernance sends sensitive env definitions to manual review with env-risk policy', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'secrets',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', hasSensitiveEnv: true }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', hasSensitiveEnv: true }),
+      ],
+      isDuplicate: true,
+      hasSensitiveEnv: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].mcpId, 'secrets');
+  assert.equal(plan.actions[0].envRiskPolicy, 'sensitive-env-blocks-canonicalization');
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.match(plan.actions[0].reason, /sensitive env risk/i);
+});
+
+test('planMcpGovernance sends unknown transport definitions to manual review with env-risk policy', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'unknown-server',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', transport: 'unknown', command: undefined }),
+        makeDefinition({ agentName: 'opencode', transport: 'unknown', command: undefined }),
+      ],
+      transport: 'unknown',
+      command: undefined,
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].mcpId, 'unknown-server');
+  assert.equal(plan.actions[0].envRiskPolicy, 'unknown-transport-requires-review');
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.match(plan.actions[0].reason, /unknown transport/i);
 });
