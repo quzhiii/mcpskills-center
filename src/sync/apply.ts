@@ -38,11 +38,12 @@ export async function applySyncPlan(plan: SyncPlan, options: ApplySyncPlanOption
   const manifestPath = join(backupDir, 'manifest.json');
 
   assertUniqueWriteTargets(writeActions);
+  for (const action of writeActions) {
+    assertActionPathsWithinApprovedRoots(action, options.approvedRoots);
+  }
 
   try {
     for (const action of writeActions) {
-      assertActionPathsWithinApprovedRoots(action, options.approvedRoots);
-
       let backupPath: string | undefined;
       if (action.targetPath && await pathExists(action.targetPath)) {
         const backupEntry = await createBackupEntry(action, backupDir, generatedAt);

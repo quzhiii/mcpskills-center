@@ -422,3 +422,56 @@ test('applySyncPlan refuses target paths outside approved roots', async () => {
     /outside approved roots/
   );
 });
+
+test('applySyncPlan validates all write paths before the first write', async () => {
+  const root = await makeTempRoot();
+  const canonicalRoot = join(root, 'canonical');
+  const agentRoot = join(root, 'agent');
+  const sourceOne = join(canonicalRoot, 'skill-one');
+  const targetOne = join(agentRoot, 'skill-one');
+  const sourceTwo = join(canonicalRoot, 'skill-two');
+
+  await mkdir(sourceOne, { recursive: true });
+  await mkdir(sourceTwo, { recursive: true });
+  await mkdir(targetOne, { recursive: true });
+  await writeFile(join(sourceOne, 'SKILL.md'), 'new one', 'utf-8');
+  await writeFile(join(sourceTwo, 'SKILL.md'), 'new two', 'utf-8');
+  await writeFile(join(targetOne, 'SKILL.md'), 'old one', 'utf-8');
+
+  await assert.rejects(
+    () => applySyncPlan({
+      generatedAt: '2026-06-03T00:00:00.000Z',
+      canonicalSkillsDir: canonicalRoot,
+      strategy: 'copy',
+      actions: [
+        {
+          id: 'distribute:skill-one:0',
+          type: 'distribute',
+          skillId: 'skill-one',
+          sourcePath: sourceOne,
+          targetPath: targetOne,
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
+          requiresWrite: true,
+        },
+        {
+          id: 'distribute:skill-two:1',
+          type: 'distribute',
+          skillId: 'skill-two',
+          sourcePath: sourceTwo,
+          targetPath: 'C:/outside/skill-two',
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
+          requiresWrite: true,
+        },
+      ],
+    }, {
+      confirm: true,
+      backupsDir: join(root, 'backups'),
+      approvedRoots: [canonicalRoot, agentRoot],
+    }),
+    /outside approved roots/
+  );
+
+  assert.equal(await readFile(join(targetOne, 'SKILL.md'), 'utf-8'), 'old one');
+});
