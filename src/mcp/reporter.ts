@@ -66,6 +66,21 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
     lines.push('No manual review actions.');
   }
   lines.push('');
+  lines.push('## Canonical Profile Candidates');
+  lines.push('');
+  const canonicalCandidateActions = plan.actions.filter(action => action.canonicalProfileCandidate);
+  if (canonicalCandidateActions.length > 0) {
+    lines.push('| Profile | MCP | Source Agent | Target Agents | Blocked By Env Risk |');
+    lines.push('|---------|-----|--------------|---------------|---------------------|');
+    for (const action of canonicalCandidateActions) {
+      const candidate = action.canonicalProfileCandidate;
+      if (!candidate) continue;
+      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${candidate.blockedByEnvRisk ? 'yes' : 'no'} |`);
+    }
+  } else {
+    lines.push('No canonical profile candidates.');
+  }
+  lines.push('');
   lines.push('## Per-Agent Definitions');
   lines.push('');
   lines.push('| MCP | Agent | Transport | Command | Host | Sensitive Env |');
@@ -78,10 +93,10 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   lines.push('## Actions');
   lines.push('');
-  lines.push('| Type | MCP | Agents | Canonical Candidate | Requires Write | Reason |');
-  lines.push('|------|-----|--------|---------------------|----------------|--------|');
+  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Requires Write | Reason |');
+  lines.push('|------|-----|--------|---------------------|-----------------|----------------|--------|');
   for (const action of plan.actions) {
-    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
+    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
   }
   lines.push('');
 

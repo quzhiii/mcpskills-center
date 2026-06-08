@@ -22,6 +22,21 @@ function makePlan(): McpGovernancePlan {
         mcpId: 'filesystem',
         agentNames: ['claude-code', 'opencode'],
         canonicalAgentName: 'claude-code',
+        canonicalProfileCandidate: {
+          profileId: 'filesystem',
+          mcpId: 'filesystem',
+          sourceAgentName: 'claude-code',
+          agentNames: ['claude-code', 'opencode'],
+          definition: {
+            transport: 'stdio',
+            command: 'npx',
+            host: undefined,
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+          },
+          blockedByEnvRisk: false,
+        },
         envRiskPolicy: 'no-env-risk-detected',
         definitions: [
           {
@@ -106,11 +121,14 @@ test('renderMcpGovernancePlanMarkdown renders summary, manual review, and defini
   assert.match(markdown, /\| skip \| 1 \| 0 \|/);
   assert.match(markdown, /## Manual Review Required/);
   assert.match(markdown, /\| memory \| claude-code, codex \| MCP duplicate definitions drift across agents and require manual review \|/);
+  assert.match(markdown, /## Canonical Profile Candidates/);
+  assert.match(markdown, /\| filesystem \| filesystem \| claude-code \| claude-code, opencode \| no \|/);
   assert.match(markdown, /## Per-Agent Definitions/);
   assert.match(markdown, /\| filesystem \| claude-code \| stdio \| `npx` \| - \| no \|/);
   assert.match(markdown, /\| memory \| codex \| stdio \| `node` \| - \| no \|/);
   assert.match(markdown, /\| single \| opencode \| http \| - \| `https:\/\/example\.test\/mcp` \| no \|/);
-  assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Requires Write \| Reason \|/);
+  assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Env Risk Policy \| Requires Write \| Reason \|/);
+  assert.match(markdown, /\| canonical-candidate \| filesystem \| claude-code, opencode \| claude-code \| no-env-risk-detected \| no \| MCP server has equivalent duplicate definitions and is a canonical profile candidate \|/);
 });
 
 test('writeMcpGovernancePlanReports writes JSON with dry-run summary counts', async () => {
@@ -126,5 +144,9 @@ test('writeMcpGovernancePlanReports writes JSON with dry-run summary counts', as
   assert.equal(json.summary.actionTypes['canonical-candidate'].actions, 1);
   assert.equal(json.summary.actionTypes['manual-review'].actions, 1);
   assert.equal(json.summary.agentImpact['claude-code'].actions, 2);
+  assert.equal(json.actions[0].envRiskPolicy, 'no-env-risk-detected');
+  assert.equal(json.actions[0].canonicalProfileCandidate.profileId, 'filesystem');
+  assert.equal(json.actions[0].canonicalProfileCandidate.sourceAgentName, 'claude-code');
+  assert.equal(json.actions[0].canonicalProfileCandidate.blockedByEnvRisk, false);
   assert.match(markdown, /# MCP Governance Dry-Run Plan/);
 });
