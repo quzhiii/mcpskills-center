@@ -12,8 +12,11 @@
 当前版本策略：
 
 - 只有 `claude-code`、`opencode`、`codex` 在 registry 中属于 write-capable 线。
+- 当前写入支持只表示 skills governance：canonical promotion、per-agent distribution、backup manifest 与 restore。
+- MCP governance 是下一条产品线，但 MCP 配置写入要等 source-of-truth 与 rollback 语义被证明后再开放。
 - 所有新增 agent 默认仍保持 `enabled: false` 且 `readOnly: true`。
 - 对来源不明确或证据不足的 MCP 配置，一律维持 read-only / report-first。
+- CLI 继续作为治理内核。未来 Web console 应该包裹 CLI/report 产物，而不是创造另一套写入语义。
 
 ## 总览矩阵
 
@@ -136,3 +139,6 @@
   - 不要仅凭 catalog、cache、空的 compatibility 文件就上 dedicated MCP parser。
 - 对所有非基线 agent：
   - 在恢复语义没有被验证前，继续保持 `enabled: false` 与 `readOnly: true`。
+- 对产品路线图：
+  - 先完成 skills governance 正确性，再开放 MCP write governance。
+  - 在治理后的 capability state 稳定前，继续推迟 routing。

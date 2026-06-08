@@ -24,6 +24,8 @@ MCPskills Center gives one local machine a clear control surface for agent capab
 
 It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run skill sync plans, checks health status, and renders readable reports for review.
 
+The product direction is CLI-first. The CLI remains the governance kernel and operational source of truth for scan, plan, apply, and restore. A local Web console can wrap these artifacts later, but it should not replace the CLI execution model.
+
 ```text
 Claude Code config ─┐
 OpenCode config ────┼─→ scan → audit → plan → verify → report
@@ -47,6 +49,16 @@ The current release focuses on a practical local workflow:
 | Dashboard | Static offline HTML report at `reports/dashboard.html` |
 
 Agent support status is summarized in `docs/supported-agents.md`.
+
+---
+
+## Governance Roadmap
+
+Current priority is skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
+
+MCP governance is next. MCP sources stay report-first until their source-of-truth model, write boundaries, backup behavior, and restore semantics are proven.
+
+Longer-term layers are a local Web control plane over the CLI kernel, then intelligent local agent routing after governed capability state is stable. Web, SQLite history, and routing are intentionally not the first implementation priority.
 
 ---
 

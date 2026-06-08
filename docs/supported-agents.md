@@ -12,8 +12,11 @@ The project uses a staged support model:
 Current release policy:
 
 - Only `claude-code`, `opencode`, and `codex` are write-capable in the registry.
+- Current write support means skills governance only: canonical promotion, per-agent distribution, backup manifests, and restore.
+- MCP governance is the next product lane, but MCP config writes remain deferred until source-of-truth and rollback semantics are proven.
 - All newer agents remain `enabled: false` and `readOnly: true` by default.
 - Unknown or weakly proven MCP sources stay read-only and report-first.
+- The CLI remains the governance kernel. Any future Web console should wrap CLI/report artifacts instead of creating separate write semantics.
 
 ## Summary Matrix
 
@@ -136,3 +139,6 @@ Use the source-of-truth confidence column this way:
   - Do not add dedicated MCP parsers based only on catalogs, caches, or empty compatibility files.
 - For all non-baseline agents:
   - Keep `enabled: false` and `readOnly: true` until recovery semantics are tested.
+- For the product roadmap:
+  - Finish skills governance correctness before adding MCP write governance.
+  - Keep routing deferred until governed capability state is stable.

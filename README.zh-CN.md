@@ -24,6 +24,8 @@ MCPskills Center 给一台本地机器上的多套 agent 能力提供统一的�
 
 它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run skill 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
 
+产品方向是 CLI first。CLI 会继续作为治理内核，也是 scan、plan、apply、restore 的操作真相来源。后续本地 Web console 可以包裹这些产物，但不应该替代 CLI 执行模型。
+
 ```text
 Claude Code 配置 ─┐
 OpenCode 配置 ────┼─→ scan → audit → plan → verify → report
@@ -47,6 +49,16 @@ Codex 配置 ───────┘                      │
 | Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
 
 各 agent 当前支持状态可见 `docs/supported-agents.zh-CN.md`。
+
+---
+
+## 治理路线图
+
+当前优先级是 skills governance：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
+
+MCP governance 是下一条治理线。在 source-of-truth、写入边界、备份行为和 restore 语义被证明前，MCP 配置继续保持 report-first。
+
+更长期的层次是基于 CLI kernel 的本地 Web control plane，然后才是智能本地 agent routing。Web、SQLite 历史、routing 都不是当前第一优先级。
 
 ---
 
