@@ -272,6 +272,63 @@ test('executeCommand handles profile plan through injected dependencies', async 
   assert.match(output, /\[already-present\] mcp-server: agentmemory/);
 });
 
+test('executeCommand handles sync dry-run with action type summary', async () => {
+  const output = await executeCommand(makeCli('sync', { dryRun: true }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    profilesDir: 'C:/profiles',
+    backupsDir: 'C:/backups',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/claude/skills', 'C:/opencode/skills'],
+    runInventory: async () => ({
+      ...makeInventory(),
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills' },
+        { name: 'opencode', configDir: 'C:/opencode', skillsDir: 'C:/opencode/skills' },
+      ],
+      skills: [
+        {
+          id: 'duplicate-skill',
+          displayName: 'duplicate-skill',
+          sourcePath: 'C:/claude/skills/duplicate-skill',
+          agentInstallPaths: ['C:/claude/skills/duplicate-skill', 'C:/opencode/skills/duplicate-skill'],
+          isCanonical: false,
+          isSymlink: false,
+          hasSkillMd: true,
+          frontmatterValid: true,
+          isDuplicate: true,
+        },
+        {
+          id: 'broken-skill',
+          displayName: 'broken-skill',
+          sourcePath: 'C:/claude/skills/broken-skill',
+          agentInstallPaths: ['C:/claude/skills/broken-skill'],
+          isCanonical: false,
+          isSymlink: false,
+          hasSkillMd: false,
+          frontmatterValid: true,
+          isDuplicate: false,
+        },
+      ],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Sync dry-run complete!/);
+  assert.match(output, /Sync Actions: 4/);
+  assert.match(output, /Write Actions: 3/);
+  assert.match(output, /Action Types: promote-canonical=1, distribute=2, manual-review=1/);
+});
+
 test('executeCommand handles sync apply through injected dependencies', async () => {
   const output = await executeCommand(makeCli('sync', { apply: true, confirm: true }), {
     reportsDir: 'C:/reports',
@@ -334,6 +391,8 @@ test('executeCommand handles sync apply through injected dependencies', async ()
 
   assert.match(output, /Sync apply complete!/);
   assert.match(output, /Applied Actions: 1/);
+  assert.match(output, /Receipts: 1/);
+  assert.match(output, /Action Types: distribute=1/);
   assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
 });
 
@@ -369,5 +428,7 @@ test('executeCommand handles sync restore through injected dependencies', async 
 
   assert.match(output, /Sync restore complete!/);
   assert.match(output, /Restored Entries: 1/);
+  assert.match(output, /Restored Targets: 1/);
+  assert.match(output, /Action Types: distribute=1/);
   assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
 });

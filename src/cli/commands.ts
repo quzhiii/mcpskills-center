@@ -7,6 +7,7 @@ import { normalizeInventory } from '../normalizer/index.js';
 import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
+import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
@@ -120,9 +121,12 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
     const result = await context.restoreSyncBackupManifest(cli.options.restoreManifestPath, {
       approvedRoots: context.approvedSyncRoots,
     });
+    const actionTypes = formatActionTypeCounts(countRestoreActionTypes(result.restoredEntries));
     return [
       'Sync restore complete!',
       `   Restored Entries: ${result.restoredEntries.length}`,
+      `   Restored Targets: ${new Set(result.restoredEntries.map(entry => entry.targetPath)).size}`,
+      `   Action Types: ${actionTypes}`,
       `   Manifest: ${cli.options.restoreManifestPath}`,
     ].join('\n');
   }
@@ -143,17 +147,21 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
       backupsDir: context.backupsDir,
       approvedRoots: context.approvedSyncRoots,
     });
+    const actionTypes = formatActionTypeCounts(countActionTypes(result.appliedActions));
 
     return [
       'Sync apply complete!',
       `   Applied Actions: ${result.appliedActions.length}`,
       `   Backup Entries: ${result.backupEntries.length}`,
+      `   Receipts: ${result.receipts.length}`,
+      `   Action Types: ${actionTypes}`,
       `   Manifest: ${result.manifestPath}`,
     ].join('\n');
   }
 
   await context.writeAllReports(normalized, audit, context.reportsDir);
   await context.writeSyncPlanReports(plan, context.reportsDir);
+  const syncSummary = buildSyncPlanSummary(plan);
 
   return [
     'Sync dry-run complete!',
@@ -161,6 +169,8 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
     `   MCP Servers: ${normalized.mcpServers.length}`,
     `   Audit Issues: ${audit.issues.length}`,
     `   Sync Actions: ${plan.actions.length}`,
+    `   Write Actions: ${syncSummary.writeActions}`,
+    `   Action Types: ${formatSyncSummaryActionTypes(syncSummary.actionTypes)}`,
     '',
     `   Reports written to: ${context.reportsDir}`,
   ].join('\n');
@@ -257,6 +267,33 @@ function findProfile<T extends { name: string }>(profiles: T[], name: string | u
   const profile = profiles.find(item => item.name === name);
   if (!profile) throw new Error(`Profile not found: ${name}`);
   return profile;
+}
+
+function countActionTypes(actions: Array<{ type: string }>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const action of actions) {
+    counts[action.type] = (counts[action.type] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function countRestoreActionTypes(entries: Array<{ actionId: string }>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const entry of entries) {
+    const actionType = entry.actionId.split(':')[0] || 'unknown';
+    counts[actionType] = (counts[actionType] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function formatActionTypeCounts(counts: Record<string, number>): string {
+  const entries = Object.entries(counts);
+  return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count}`).join(', ') : 'none';
+}
+
+function formatSyncSummaryActionTypes(actionTypes: ReturnType<typeof buildSyncPlanSummary>['actionTypes']): string {
+  const entries = Object.entries(actionTypes);
+  return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count.actions}`).join(', ') : 'none';
 }
 
 export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
