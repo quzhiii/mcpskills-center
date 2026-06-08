@@ -61,10 +61,21 @@ export interface Skill {
 export interface MCPServer {
   id: string;
   agentSources: string[];
+  definitions?: MCPServerDefinition[];
   transport: 'stdio' | 'http' | 'sse' | 'unknown';
   command?: string;
   host?: string;
   isDuplicate: boolean;
+  isEnabled: boolean;
+  canStart: boolean | null;
+  hasSensitiveEnv: boolean;
+}
+
+export interface MCPServerDefinition {
+  agentName: string;
+  transport: MCPServer['transport'];
+  command?: string;
+  host?: string;
   isEnabled: boolean;
   canStart: boolean | null;
   hasSensitiveEnv: boolean;
