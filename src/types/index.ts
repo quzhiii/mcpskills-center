@@ -61,6 +61,7 @@ export interface Skill {
 export interface MCPServer {
   id: string;
   agentSources: string[];
+  definitions?: MCPServerDefinition[];
   transport: 'stdio' | 'http' | 'sse' | 'unknown';
   command?: string;
   host?: string;
@@ -68,6 +69,45 @@ export interface MCPServer {
   isEnabled: boolean;
   canStart: boolean | null;
   hasSensitiveEnv: boolean;
+}
+
+export interface MCPServerDefinition {
+  agentName: string;
+  transport: MCPServer['transport'];
+  command?: string;
+  host?: string;
+  isEnabled: boolean;
+  canStart: boolean | null;
+  hasSensitiveEnv: boolean;
+}
+
+export interface McpGovernancePlan {
+  generatedAt: string;
+  actions: McpGovernanceAction[];
+}
+
+export interface McpGovernanceAction {
+  id: string;
+  type: 'canonical-candidate' | 'skip' | 'manual-review';
+  mcpId: string;
+  agentNames: string[];
+  canonicalAgentName?: string;
+  canonicalProfileCandidate?: McpCanonicalProfileCandidate;
+  envRiskPolicy: McpEnvRiskPolicy;
+  definitions?: MCPServerDefinition[];
+  reason: string;
+  requiresWrite: false;
+}
+
+export type McpEnvRiskPolicy = 'no-env-risk-detected' | 'sensitive-env-blocks-canonicalization' | 'unknown-transport-requires-review';
+
+export interface McpCanonicalProfileCandidate {
+  profileId: string;
+  mcpId: string;
+  sourceAgentName: string;
+  agentNames: string[];
+  definition: Omit<MCPServerDefinition, 'agentName'>;
+  blockedByEnvRisk: boolean;
 }
 
 export interface Profile {

@@ -4,6 +4,7 @@ import { writeCapabilityMatrixReports } from './matrix/reporter.js';
 import { parseCliArgs } from './cli.js';
 import { applySyncPlan } from './sync/apply.js';
 import { writeSyncPlanReports } from './sync/reporter.js';
+import { writeMcpGovernancePlanReports } from './mcp/reporter.js';
 import { loadProfiles } from './profiles/loader.js';
 import { createDefaultPaths, executeCommand } from './cli/commands.js';
 import { loadSyncConfig } from './config/sync.js';
@@ -28,6 +29,7 @@ async function main() {
     writeAllReports,
     writeSyncPlanReports,
     writeCapabilityMatrixReports,
+    writeMcpGovernancePlanReports,
     loadProfiles,
     listAgents: async () => agentRegistry.agents,
     discoverAgents,

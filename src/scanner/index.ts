@@ -4,7 +4,7 @@ import { ClaudeCodeScanner } from './claude-code.js';
 import { OpenCodeScanner } from './opencode.js';
 import { CodexScanner } from './codex.js';
 import { createDefaultScannerRegistry } from './registry.js';
-import type { AgentConfig, Inventory, Skill, MCPServer } from '../types/index.js';
+import type { AgentConfig, Inventory, Skill, MCPServer, MCPServerDefinition } from '../types/index.js';
 import type { ScannerRegistry } from './registry.js';
 
 const HOME = homedir();
@@ -68,9 +68,10 @@ export async function runInventory(
     const existing = mcpMap.get(mcp.id);
     if (existing) {
       existing.agentSources.push(...mcp.agentSources);
+      existing.definitions?.push(...createMcpDefinitions(mcp));
       existing.isDuplicate = true;
     } else {
-      mcpMap.set(mcp.id, { ...mcp, isDuplicate: false });
+      mcpMap.set(mcp.id, { ...mcp, definitions: createMcpDefinitions(mcp), isDuplicate: false });
     }
   }
 
@@ -84,3 +85,17 @@ export async function runInventory(
 }
 
 export { ClaudeCodeScanner, OpenCodeScanner, CodexScanner };
+
+function createMcpDefinitions(mcp: MCPServer): MCPServerDefinition[] {
+  if (mcp.definitions) return mcp.definitions;
+
+  return mcp.agentSources.map(agentName => ({
+    agentName,
+    transport: mcp.transport,
+    command: mcp.command,
+    host: mcp.host,
+    isEnabled: mcp.isEnabled,
+    canStart: mcp.canStart,
+    hasSensitiveEnv: mcp.hasSensitiveEnv,
+  }));
+}
