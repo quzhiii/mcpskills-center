@@ -92,9 +92,19 @@ export interface McpGovernanceAction {
   mcpId: string;
   agentNames: string[];
   canonicalAgentName?: string;
+  canonicalProfileCandidate?: McpCanonicalProfileCandidate;
   definitions?: MCPServerDefinition[];
   reason: string;
   requiresWrite: false;
+}
+
+export interface McpCanonicalProfileCandidate {
+  profileId: string;
+  mcpId: string;
+  sourceAgentName: string;
+  agentNames: string[];
+  definition: Omit<MCPServerDefinition, 'agentName'>;
+  blockedByEnvRisk: boolean;
 }
 
 export interface Profile {

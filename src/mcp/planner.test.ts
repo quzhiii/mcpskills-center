@@ -60,6 +60,21 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
   assert.equal(plan.actions[0].mcpId, 'filesystem');
   assert.deepEqual(plan.actions[0].agentNames, ['claude-code', 'opencode']);
   assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
+  assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
+    profileId: 'filesystem',
+    mcpId: 'filesystem',
+    sourceAgentName: 'claude-code',
+    agentNames: ['claude-code', 'opencode'],
+    definition: {
+      transport: 'stdio',
+      command: 'npx',
+      host: undefined,
+      isEnabled: true,
+      canStart: null,
+      hasSensitiveEnv: false,
+    },
+    blockedByEnvRisk: false,
+  });
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /equivalent duplicate/i);
 });

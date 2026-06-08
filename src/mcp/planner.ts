@@ -50,6 +50,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
       definitions,
       agentNames,
       canonicalAgentName: agentNames[0],
+      canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, definitions, agentNames),
       reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
     }));
   }
@@ -67,6 +68,7 @@ function createAction(args: {
   definitions: MCPServerDefinition[];
   agentNames: string[];
   canonicalAgentName?: string;
+  canonicalProfileCandidate?: McpGovernanceAction['canonicalProfileCandidate'];
   reason: string;
 }): McpGovernanceAction {
   return {
@@ -75,6 +77,7 @@ function createAction(args: {
     mcpId: args.mcp.id,
     agentNames: args.agentNames,
     canonicalAgentName: args.canonicalAgentName,
+    canonicalProfileCandidate: args.canonicalProfileCandidate,
     definitions: args.definitions,
     reason: args.reason,
     requiresWrite: false,
@@ -114,4 +117,27 @@ function normalizeDefinition(definition: MCPServerDefinition): string {
 
 function hasSensitiveEnvDriftRisk(definitions: MCPServerDefinition[]): boolean {
   return definitions.some(definition => definition.hasSensitiveEnv);
+}
+
+function createCanonicalProfileCandidate(
+  mcp: MCPServer,
+  definitions: MCPServerDefinition[],
+  agentNames: string[]
+): NonNullable<McpGovernanceAction['canonicalProfileCandidate']> {
+  const sourceDefinition = definitions[0];
+  return {
+    profileId: mcp.id,
+    mcpId: mcp.id,
+    sourceAgentName: sourceDefinition.agentName,
+    agentNames,
+    definition: {
+      transport: sourceDefinition.transport,
+      command: sourceDefinition.command,
+      host: sourceDefinition.host,
+      isEnabled: sourceDefinition.isEnabled,
+      canStart: sourceDefinition.canStart,
+      hasSensitiveEnv: sourceDefinition.hasSensitiveEnv,
+    },
+    blockedByEnvRisk: false,
+  };
 }
