@@ -81,6 +81,23 @@ export interface MCPServerDefinition {
   hasSensitiveEnv: boolean;
 }
 
+export type McpAdapterScopeKind = 'global' | 'project' | 'workspace' | 'unknown';
+
+export interface McpAdapterScope {
+  kind: McpAdapterScopeKind;
+  id?: string;
+}
+
+export interface ParsedMcpConfigServer {
+  id: string;
+  transport: MCPServer['transport'];
+  command?: string;
+  host?: string;
+  isEnabled: boolean;
+  hasSensitiveEnv: boolean;
+  scope: McpAdapterScope;
+}
+
 export interface McpGovernancePlan {
   generatedAt: string;
   actions: McpGovernanceAction[];
