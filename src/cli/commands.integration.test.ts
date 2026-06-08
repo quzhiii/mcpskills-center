@@ -4,6 +4,7 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseCliArgs } from '../cli.js';
+import { writeCapabilityMatrixReports } from '../matrix/reporter.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import type { Inventory } from '../types/index.js';
@@ -68,11 +69,16 @@ test('sync apply and restore simulate safely in an isolated CLI environment', as
     backupsDir,
     profilesDir,
     syncConfigPath: join(root, 'config', 'sync.json'),
+    agentConfigPath: join(root, 'config', 'agents.json'),
     approvedSyncRoots: [canonicalRoot, agentOneSkillsDir, agentTwoSkillsDir],
     runInventory: async () => inventory,
     writeAllReports: async () => undefined,
     writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
     loadProfiles: async () => [],
+    listAgents: async () => inventory.agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
     applySyncPlan,
     restoreSyncBackupManifest,
   };
@@ -101,4 +107,72 @@ test('sync apply and restore simulate safely in an isolated CLI environment', as
   assert.equal(await readFile(join(targetPath, 'SKILL.md'), 'utf-8'), 'target content');
   assert.equal(await readFile(join(targetPath, 'TARGET_ONLY.md'), 'utf-8'), 'target-only');
   await assert.rejects(() => access(join(targetPath, 'SOURCE_ONLY.md')));
+});
+
+test('matrix command writes capability matrix reports in an isolated CLI environment', async () => {
+  const root = await makeTempRoot();
+  const reportsDir = join(root, 'reports');
+
+  const inventory: Inventory = {
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    agents: [
+      { name: 'claude-code', configDir: join(root, 'claude-config'), skillsDir: join(root, 'claude-skills') },
+      { name: 'opencode', configDir: join(root, 'opencode-config'), skillsDir: join(root, 'opencode-skills') },
+    ],
+    skills: [
+      {
+        id: 'shared-skill',
+        displayName: 'shared-skill',
+        sourcePath: join(root, 'claude-skills', 'shared-skill'),
+        agentInstallPaths: [join(root, 'claude-skills', 'shared-skill'), join(root, 'opencode-skills', 'shared-skill')],
+        isCanonical: false,
+        isSymlink: false,
+        hasSkillMd: true,
+        frontmatterValid: true,
+        isDuplicate: true,
+      },
+    ],
+    mcpServers: [
+      {
+        id: 'agentmemory',
+        agentSources: ['claude-code'],
+        transport: 'stdio',
+        command: 'npx',
+        isDuplicate: false,
+        isEnabled: true,
+        canStart: null,
+        hasSensitiveEnv: false,
+      },
+    ],
+    profiles: [],
+  };
+
+  const output = await executeCommand(parseCliArgs(['matrix']), {
+    reportsDir,
+    canonicalSkillsDir: join(root, 'canonical'),
+    backupsDir: join(root, 'backups'),
+    profilesDir: join(root, 'profiles'),
+    syncConfigPath: join(root, 'config', 'sync.json'),
+    agentConfigPath: join(root, 'config', 'agents.json'),
+    approvedSyncRoots: [],
+    runInventory: async () => inventory,
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports,
+    loadProfiles: async () => [],
+    listAgents: async () => inventory.agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  const markdown = await readFile(join(reportsDir, 'capability-matrix-current.md'), 'utf-8');
+  const json = JSON.parse(await readFile(join(reportsDir, 'capability-matrix-current.json'), 'utf-8'));
+
+  assert.match(output, /Capability matrix complete!/);
+  assert.match(markdown, /shared-skill/);
+  assert.match(markdown, /agentmemory/);
+  assert.equal(json.summary.totalSkillCapabilities, 1);
+  assert.equal(json.summary.totalMcpCapabilities, 1);
 });

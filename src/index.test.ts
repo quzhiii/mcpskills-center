@@ -24,6 +24,19 @@ test('parseCliArgs parses profile plan command', () => {
   assert.equal(parsed.options.profileName, 'coding');
 });
 
+test('parseCliArgs parses agents list command', () => {
+  const parsed = parseCliArgs(['agents', 'list']);
+
+  assert.equal(parsed.command, 'agents');
+  assert.equal(parsed.options.subcommand, 'list');
+});
+
+test('parseCliArgs parses matrix command', () => {
+  const parsed = parseCliArgs(['matrix']);
+
+  assert.equal(parsed.command, 'matrix');
+});
+
 test('parseCliArgs parses active health check options', () => {
   const parsed = parseCliArgs(['health', '--active', '--allow-command', 'npx', '--timeout', '2500']);
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**面向 Claude Code、OpenCode、Codex 的本地优先 CLI，用来扫描、审计、规划和同步 MCP server 与 agent skills。**
+**面向 Claude Code、OpenCode、Codex 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -12,7 +12,7 @@
 
 **中文** · [English](README.md)
 
-[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
+[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [支持的 Agents](docs/supported-agents.zh-CN.md) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
 
 </div>
 
@@ -22,7 +22,9 @@
 
 MCPskills Center 给一台本地机器上的多套 agent 能力提供统一的可视化和治理入口。
 
-它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
+它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run skill 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
+
+产品方向是 CLI first。CLI 会继续作为治理内核，也是 scan、plan、apply、restore 的操作真相来源。后续本地 Web console 可以包裹这些产物，但不应该替代 CLI 执行模型。
 
 ```text
 Claude Code 配置 ─┐
@@ -45,6 +47,18 @@ Codex 配置 ───────┘                      │
 | Profiles | 以 `coding`、`research` 等场景包做只读规划 |
 | Health 检查 | 默认被动检查，显式 allowlist 后才做主动命令探测 |
 | Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
+
+各 agent 当前支持状态可见 `docs/supported-agents.zh-CN.md`。
+
+---
+
+## 治理路线图
+
+当前优先级是 skills governance：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
+
+MCP governance 是下一条治理线。在 source-of-truth、写入边界、备份行为和 restore 语义被证明前，MCP 配置继续保持 report-first。
+
+更长期的层次是基于 CLI kernel 的本地 Web control plane，然后才是智能本地 agent routing。Web、SQLite 历史、routing 都不是当前第一优先级。
 
 ---
 
@@ -92,6 +106,11 @@ node dist/index.js sync --dry-run
 - `reports/sync-plan-current.json`
 - `reports/sync-plan-current.md`
 
+`matrix` 会生成：
+
+- `reports/capability-matrix-current.json`
+- `reports/capability-matrix-current.md`
+
 `sync --apply --confirm` 会在 `backups/` 下写入带时间戳的备份目录，并生成一次 apply 对应的 consolidated manifest。
 
 ### Dashboard 预览
@@ -120,6 +139,9 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 | `node dist/index.js profile list` | 列出本地 profile | 无 |
 | `node dist/index.js profile show <name>` | 打印一个 profile 的 JSON | 无 |
 | `node dist/index.js profile plan <name>` | 将 profile 与当前 inventory 对比 | 无 |
+| `node dist/index.js agents list` | 列出 `config/agents.json` 中注册的本地 agents | 无 |
+| `node dist/index.js agents discover` | 发现 Qoder、CodeBuddy、WorkBuddy、Trae 等本地 agent 配置候选路径 | `reports/` |
+| `node dist/index.js matrix` | 为已注册 agents 上发现的 skills 和 MCP servers 生成能力矩阵 | `reports/` |
 | `node dist/index.js health` | 执行被动 MCP 健康检查 | 无 |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | 对 allowlist 中的命令做显式主动探测 | 无 |
 | `node dist/index.js help` | 查看 CLI 帮助 | 无 |
@@ -184,7 +206,31 @@ node dist/index.js profile plan coding
 
 输出会按 `already-present`、`missing`、`disable` 三类展示，不会修改 live config。
 
-### 7. 先做安全的被动 MCP 健康检查
+### 7. 查看已注册的本地 agents
+
+```bash
+node dist/index.js agents list
+```
+
+这个命令只读取当前加载后的 registry，不扫描 live config。仓库里的 `config/agents.json` 还包含 Qoder、Qoder Work、CodeBuddy、WorkBuddy、Trae 的 disabled/read-only 占位配置，但 disabled 条目不会出现在运行时加载后的列表里。
+
+### 8. 发现本地 agent 候选配置路径
+
+```bash
+node dist/index.js agents discover
+```
+
+Discovery 是只读操作。它会检查常见本地路径，并写出 `reports/agent-discovery-current.json` 与 `reports/agent-discovery-current.md`。
+
+### 9. 查看当前 inventory 的跨 agent 能力矩阵
+
+```bash
+node dist/index.js matrix
+```
+
+适合在当前 inventory 之上快速看到哪些 skill 和 MCP 能力分布在多个 agent 上、哪些 agent 缺失对应能力，以及共享能力数量。它会写出 `reports/capability-matrix-current.json` 与 `reports/capability-matrix-current.md`。
+
+### 10. 先做安全的被动 MCP 健康检查
 
 ```bash
 node dist/index.js health
@@ -192,7 +238,7 @@ node dist/index.js health
 
 被动模式不会启动命令，只检查 transport 形态、command 是否存在、URL 是否有效、敏感 env key 风险等。
 
-### 8. 对 allowlist 命令做显式主动探测
+### 11. 对 allowlist 命令做显式主动探测
 
 ```bash
 node dist/index.js health --active --allow-command npx --timeout 3000

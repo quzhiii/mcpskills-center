@@ -1,4 +1,4 @@
-export type CliCommand = 'scan' | 'audit' | 'sync' | 'profile' | 'health' | 'help';
+export type CliCommand = 'scan' | 'audit' | 'sync' | 'profile' | 'agents' | 'matrix' | 'health' | 'help';
 
 export interface CliOptions {
   dryRun: boolean;
@@ -37,7 +37,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     command = isCliCommand(candidate) ? candidate : 'help';
   }
 
-  if (command === 'profile') {
+  if (command === 'profile' || command === 'agents') {
     subcommand = args.shift();
     profileName = args[0] && !args[0].startsWith('--') ? args.shift() : undefined;
   }
@@ -95,5 +95,5 @@ export function parseCliArgs(argv: string[]): CliArgs {
 }
 
 function isCliCommand(value: string): value is CliCommand {
-  return value === 'scan' || value === 'audit' || value === 'sync' || value === 'profile' || value === 'health' || value === 'help';
+  return value === 'scan' || value === 'audit' || value === 'sync' || value === 'profile' || value === 'agents' || value === 'matrix' || value === 'health' || value === 'help';
 }

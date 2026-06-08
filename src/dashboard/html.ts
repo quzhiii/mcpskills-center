@@ -1,12 +1,16 @@
-import type { AuditReport, Inventory } from '../types/index.js';
+import { resolveAgentSupport } from '../agents/support.js';
+import { buildSyncPlanSummary } from '../sync/reporter.js';
+import type { AuditReport, Inventory, SyncPlan } from '../types/index.js';
 
-export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): string {
+export function renderDashboardHtml(inventory: Inventory, audit: AuditReport, syncPlan?: SyncPlan): string {
   const recommendations = audit.recommendations.slice(0, 20);
   const issues = audit.issues.slice(0, 20);
   const skills = inventory.skills.slice(0, 20);
+  const agents = inventory.agents.slice(0, 20);
+  const generatedAt = escapeHtml(audit.generatedAt);
 
   return `<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,6 +20,7 @@ export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): s
     body { margin: 0; background: #f6f3ea; color: #1d2433; }
     main { max-width: 1180px; margin: 0 auto; padding: 40px 24px 56px; }
     header { display: grid; gap: 8px; margin-bottom: 28px; }
+    .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     h1 { margin: 0; font-size: clamp(32px, 5vw, 56px); letter-spacing: -0.05em; }
     h2 { margin: 0 0 14px; font-size: 22px; letter-spacing: -0.02em; }
     p { margin: 0; color: #5d6678; }
@@ -32,100 +37,211 @@ export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): s
     .severity-error { background: #ffe0df; color: #9f1d19; }
     .severity-warning { background: #fff1ca; color: #79520b; }
     .severity-info { background: #dfeafe; color: #214c9a; }
+    .language-toggle { display: inline-flex; gap: 8px; align-items: center; border: 1px solid #d8cfbd; border-radius: 999px; padding: 6px; background: #fffdf8; box-shadow: 0 8px 18px rgba(29, 36, 51, 0.06); }
+    .language-toggle button { border: 0; border-radius: 999px; padding: 8px 12px; background: transparent; color: #5d6678; cursor: pointer; font: inherit; }
+    .language-toggle button[aria-pressed="true"] { background: #1d2433; color: #fffdf8; }
+    [data-lang] { display: none; }
+    html[data-language="zh-CN"] [data-lang="zh-CN"] { display: inline; }
+    html[data-language="en"] [data-lang="en"] { display: inline; }
+    html[data-language="zh-CN"] [data-lang-block="zh-CN"] { display: block; }
+    html[data-language="en"] [data-lang-block="en"] { display: block; }
+    [data-lang-block] { display: none; }
     @media (max-width: 820px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } table { font-size: 13px; } }
-    @media (max-width: 560px) { main { padding: 24px 14px 36px; } .grid { grid-template-columns: 1fr; } th, td { padding: 9px; } }
+    @media (max-width: 560px) { main { padding: 24px 14px 36px; } .grid { grid-template-columns: 1fr; } th, td { padding: 9px; } .header-row { flex-direction: column; } }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <h1>MCPskills Center Dashboard</h1>
-      <p>Generated ${escapeHtml(audit.generatedAt)}. Local-only static report; no external assets.</p>
+      <div class="header-row">
+        <div>
+          <h1><span data-lang="en">MCPskills Center Dashboard</span><span data-lang="zh-CN">MCPskills Center 仪表盘</span></h1>
+          <p><span data-lang="en">Generated ${generatedAt}. Local-only static report; no external assets.</span><span data-lang="zh-CN">生成时间 ${generatedAt}。纯本地静态报告，不依赖外部资源。</span></p>
+        </div>
+        <div class="language-toggle" aria-label="language-toggle">
+          <button type="button" data-language-switch="zh-CN" aria-pressed="true">中文</button>
+          <button type="button" data-language-switch="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
     </header>
 
     <section class="grid" aria-label="Summary">
-      ${metricCard('Total Skills', inventory.skills.length)}
-      ${metricCard('Total MCP Servers', inventory.mcpServers.length)}
-      ${metricCard('Issues', audit.issues.length)}
-      ${metricCard('Recommendations', audit.recommendations.length)}
+      ${metricCard('Total Skills', '技能总数', inventory.skills.length)}
+      ${metricCard('Total MCP Servers', 'MCP 服务总数', inventory.mcpServers.length)}
+      ${metricCard('Issues', '问题数', audit.issues.length)}
+      ${metricCard('Recommendations', '建议数', audit.recommendations.length)}
     </section>
 
+    ${renderSyncPlanSection(syncPlan)}
+
     <section class="card">
-      <h2>Recommendations</h2>
+      <h2><span data-lang="en">Recommendations</span><span data-lang="zh-CN">建议动作</span></h2>
       ${renderRecommendationsTable(recommendations)}
     </section>
 
     <section class="card">
-      <h2>Skills</h2>
+      <h2><span data-lang="en">Agent Support</span><span data-lang="zh-CN">支持状态</span></h2>
+      ${renderAgentSupportTable(agents)}
+    </section>
+
+    <section class="card">
+      <h2><span data-lang="en">Skills</span><span data-lang="zh-CN">技能</span></h2>
       ${renderSkillsTable(skills)}
     </section>
 
     <section class="card">
-      <h2>Issues</h2>
+      <h2><span data-lang="en">Issues</span><span data-lang="zh-CN">问题</span></h2>
       ${renderIssuesTable(issues)}
     </section>
   </main>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const buttons = Array.from(document.querySelectorAll('[data-language-switch]'));
+      const setLanguage = (language) => {
+        root.setAttribute('data-language', language);
+        root.setAttribute('lang', language);
+        buttons.forEach((button) => {
+          button.setAttribute('aria-pressed', button.getAttribute('data-language-switch') === language ? 'true' : 'false');
+        });
+      };
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => setLanguage(button.getAttribute('data-language-switch') || 'zh-CN'));
+      });
+
+      setLanguage('zh-CN');
+    })();
+  </script>
 </body>
 </html>`;
 }
 
-function metricCard(label: string, value: number): string {
-  return `<article class="card metric"><strong>${value}</strong><span>${escapeHtml(label)}</span></article>`;
+function metricCard(labelEn: string, labelZh: string, value: number): string {
+  return `<article class="card metric"><strong>${value}</strong><span><span data-lang="en">${escapeHtml(labelEn)}</span><span data-lang="zh-CN">${escapeHtml(labelZh)}</span></span></article>`;
 }
 
 function renderSkillsTable(skills: Inventory['skills']): string {
-  if (skills.length === 0) return '<p>No skills found.</p>';
+  if (skills.length === 0) return '<p><span data-lang="en">No skills found.</span><span data-lang="zh-CN">未发现 skills。</span></p>';
 
   const rows = skills.map(skill => `
     <tr>
       <td>${escapeHtml(skill.id)}</td>
       <td>${escapeHtml(String(skill.agentInstallPaths.length))}</td>
-      <td>${skill.hasSkillMd ? 'yes' : 'no'}</td>
-      <td>${skill.frontmatterValid ? 'yes' : 'no'}</td>
+      <td>${renderBooleanText(skill.hasSkillMd)}</td>
+      <td>${renderBooleanText(skill.frontmatterValid)}</td>
     </tr>`).join('');
 
   return `<table>
-    <thead><tr><th>Skill</th><th>Installs</th><th>SKILL.md</th><th>Frontmatter</th></tr></thead>
+    <thead><tr><th><span data-lang="en">Skill</span><span data-lang="zh-CN">技能</span></th><th><span data-lang="en">Installs</span><span data-lang="zh-CN">安装数</span></th><th><span data-lang="en">SKILL.md</span><span data-lang="zh-CN">说明文件</span></th><th><span data-lang="en">Frontmatter</span><span data-lang="zh-CN">元数据</span></th></tr></thead>
+    <tbody>${rows}
+    </tbody>
+  </table>`;
+}
+
+function renderAgentSupportTable(agents: Inventory['agents']): string {
+  if (agents.length === 0) return '<p><span data-lang="en">No agents found.</span><span data-lang="zh-CN">未发现 agents。</span></p>';
+
+  const rows = agents.map(agent => `
+    <tr>
+      <td>${escapeHtml(agent.id ?? agent.name)}</td>
+      <td>${escapeHtml(agent.scannerType ?? agent.name)}</td>
+      <td>${renderDualText(resolveAgentSupport(agent).currentLevel, translateSupportLevel(resolveAgentSupport(agent).currentLevel))}</td>
+      <td>${renderDualText(resolveAgentSupport(agent).sourceOfTruthConfidence, translateConfidence(resolveAgentSupport(agent).sourceOfTruthConfidence))}</td>
+    </tr>`).join('');
+
+  return `<table>
+    <thead><tr><th><span data-lang="en">Agent</span><span data-lang="zh-CN">代理</span></th><th><span data-lang="en">Scanner</span><span data-lang="zh-CN">扫描器</span></th><th><span data-lang="en">Support</span><span data-lang="zh-CN">支持级别</span></th><th><span data-lang="en">Source-of-Truth Confidence</span><span data-lang="zh-CN">来源可信度</span></th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
 }
 
 function renderRecommendationsTable(recommendations: AuditReport['recommendations']): string {
-  if (recommendations.length === 0) return '<p>No recommendations.</p>';
+  if (recommendations.length === 0) return '<p><span data-lang="en">No recommendations.</span><span data-lang="zh-CN">暂无建议动作。</span></p>';
 
   const rows = recommendations.map(recommendation => `
     <tr>
-      <td>${escapeHtml(recommendation.category)}</td>
+      <td>${renderDualText(recommendation.category, translateRecommendationCategory(recommendation.category))}</td>
       <td>${escapeHtml(`${recommendation.targetType}: ${recommendation.targetId}`)}</td>
-      <td><span class="pill severity-${escapeHtml(recommendation.severity)}">${escapeHtml(recommendation.severity)}</span></td>
-      <td>${recommendation.requiresWrite ? 'yes' : 'no'}</td>
-      <td>${escapeHtml(recommendation.suggestedAction)}</td>
+      <td><span class="pill severity-${escapeHtml(recommendation.severity)}">${renderDualText(recommendation.severity, translateSeverity(recommendation.severity))}</span></td>
+      <td>${renderBooleanText(recommendation.requiresWrite)}</td>
+      <td>${renderDualText(recommendation.suggestedAction, translateSuggestedAction(recommendation.suggestedAction))}</td>
     </tr>`).join('');
 
   return `<table>
-    <thead><tr><th>Category</th><th>Target</th><th>Severity</th><th>Requires Write</th><th>Action</th></tr></thead>
+    <thead><tr><th><span data-lang="en">Category</span><span data-lang="zh-CN">类别</span></th><th><span data-lang="en">Target</span><span data-lang="zh-CN">目标</span></th><th><span data-lang="en">Severity</span><span data-lang="zh-CN">严重度</span></th><th><span data-lang="en">Requires Write</span><span data-lang="zh-CN">需要写入</span></th><th><span data-lang="en">Action</span><span data-lang="zh-CN">动作</span></th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
 }
 
+function renderSyncPlanSection(syncPlan: SyncPlan | undefined): string {
+  if (!syncPlan) return '';
+
+  const summary = buildSyncPlanSummary(syncPlan);
+  const actionRows = Object.entries(summary.actionTypes).map(([actionType, count]) => `
+    <tr>
+      <td>${escapeHtml(actionType)}</td>
+      <td>${escapeHtml(String(count.actions))}</td>
+      <td>${escapeHtml(String(count.writeActions))}</td>
+    </tr>`).join('');
+  const agentRows = Object.entries(summary.agentImpact).map(([agentName, count]) => `
+    <tr>
+      <td>${escapeHtml(agentName)}</td>
+      <td>${escapeHtml(String(count.actions))}</td>
+      <td>${escapeHtml(String(count.writeActions))}</td>
+      <td>${escapeHtml(formatActionTypeCounts(count.actionTypes))}</td>
+    </tr>`).join('');
+  const manualReviewRows = syncPlan.actions
+    .filter(action => action.type === 'manual-review')
+    .map(action => `
+    <tr>
+      <td>${escapeHtml(action.skillId)}</td>
+      <td>${escapeHtml(action.reason)}</td>
+    </tr>`).join('');
+
+  return `<section class="card">
+      <h2><span data-lang="en">Sync Plan</span><span data-lang="zh-CN">同步计划</span></h2>
+      <p><span data-lang="en">${escapeHtml(String(summary.totalActions))} actions, ${escapeHtml(String(summary.writeActions))} writes.</span><span data-lang="zh-CN">${escapeHtml(String(summary.totalActions))} 个动作，${escapeHtml(String(summary.writeActions))} 个写入动作。</span></p>
+      <table>
+        <thead><tr><th><span data-lang="en">Action Type</span><span data-lang="zh-CN">动作类型</span></th><th><span data-lang="en">Actions</span><span data-lang="zh-CN">动作数</span></th><th><span data-lang="en">Writes</span><span data-lang="zh-CN">写入数</span></th></tr></thead>
+        <tbody>${actionRows}
+        </tbody>
+      </table>
+      ${agentRows ? `<h2><span data-lang="en">Agent Impact</span><span data-lang="zh-CN">Agent 影响</span></h2><table>
+        <thead><tr><th>Agent</th><th><span data-lang="en">Actions</span><span data-lang="zh-CN">动作数</span></th><th><span data-lang="en">Writes</span><span data-lang="zh-CN">写入数</span></th><th><span data-lang="en">Action Types</span><span data-lang="zh-CN">动作类型</span></th></tr></thead>
+        <tbody>${agentRows}
+        </tbody>
+      </table>` : ''}
+      ${manualReviewRows ? `<h2><span data-lang="en">Manual Review</span><span data-lang="zh-CN">人工复核</span></h2><table>
+        <thead><tr><th><span data-lang="en">Skill</span><span data-lang="zh-CN">技能</span></th><th><span data-lang="en">Reason</span><span data-lang="zh-CN">原因</span></th></tr></thead>
+        <tbody>${manualReviewRows}
+        </tbody>
+      </table>` : ''}
+    </section>`;
+}
+
 function renderIssuesTable(issues: AuditReport['issues']): string {
-  if (issues.length === 0) return '<p>No issues found.</p>';
+  if (issues.length === 0) return '<p><span data-lang="en">No issues found.</span><span data-lang="zh-CN">未发现问题。</span></p>';
 
   const rows = issues.map(issue => `
     <tr>
       <td>${escapeHtml(issue.type)}</td>
       <td>${escapeHtml(issue.item)}</td>
-      <td><span class="pill severity-${escapeHtml(issue.severity)}">${escapeHtml(issue.severity)}</span></td>
+      <td><span class="pill severity-${escapeHtml(issue.severity)}">${renderDualText(issue.severity, translateSeverity(issue.severity))}</span></td>
       <td>${escapeHtml(issue.description)}</td>
     </tr>`).join('');
 
   return `<table>
-    <thead><tr><th>Type</th><th>Item</th><th>Severity</th><th>Description</th></tr></thead>
+    <thead><tr><th><span data-lang="en">Type</span><span data-lang="zh-CN">类型</span></th><th><span data-lang="en">Item</span><span data-lang="zh-CN">对象</span></th><th><span data-lang="en">Severity</span><span data-lang="zh-CN">严重度</span></th><th><span data-lang="en">Description</span><span data-lang="zh-CN">说明</span></th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
+}
+
+function formatActionTypeCounts(counts: Record<string, number>): string {
+  return Object.entries(counts).map(([actionType, count]) => `${actionType}: ${count}`).join(', ');
 }
 
 function escapeHtml(value: string): string {
@@ -135,4 +251,79 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function renderDualText(labelEn: string, labelZh: string): string {
+  return `<span data-lang="en">${escapeHtml(labelEn)}</span><span data-lang="zh-CN">${escapeHtml(labelZh)}</span>`;
+}
+
+function renderBooleanText(value: boolean): string {
+  return renderDualText(value ? 'yes' : 'no', value ? '是' : '否');
+}
+
+function translateSeverity(severity: string): string {
+  switch (severity) {
+    case 'error':
+      return '错误';
+    case 'warning':
+      return '警告';
+    case 'info':
+      return '提示';
+    default:
+      return severity;
+  }
+}
+
+function translateConfidence(confidence: string): string {
+  switch (confidence) {
+    case 'high':
+      return '高';
+    case 'medium':
+      return '中';
+    case 'low':
+      return '低';
+    default:
+      return confidence;
+  }
+}
+
+function translateRecommendationCategory(category: string): string {
+  switch (category) {
+    case 'manual-review':
+      return '人工复核';
+    case 'merge':
+      return '合并';
+    case 'remove':
+      return '移除';
+    default:
+      return category;
+  }
+}
+
+function translateSuggestedAction(action: string): string {
+  switch (action) {
+    case 'Review without executing HTML':
+      return '在不执行 HTML 的前提下检查';
+    case 'Remove the incomplete skill or add a valid SKILL.md after manual review':
+      return '移除不完整的 skill，或在人工复核后补齐有效的 SKILL.md';
+    case 'Plan consolidation through a canonical skills store before changing files':
+      return '在变更文件前，先基于规范技能仓规划整合';
+    case 'Confirm secrets are stored securely and never copied into generated reports':
+      return '确认密钥已安全存储，且绝不会被复制进生成报告';
+    case 'Decide whether this MCP should stay duplicated or be managed by a shared profile':
+      return '决定这个 MCP 是保留重复安装，还是改由共享 profile 管理';
+    default:
+      return action;
+  }
+}
+
+function translateSupportLevel(level: string): string {
+  switch (level) {
+    case 'dedicated read-only plus write-ready workflow support':
+      return '专用只读扫描，外加可写工作流支持';
+    case 'undocumented/unknown':
+      return '未文档化/未知';
+    default:
+      return level;
+  }
 }

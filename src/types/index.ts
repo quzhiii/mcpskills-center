@@ -1,9 +1,48 @@
+import type { AgentSupportMetadata } from '../agents/support.js';
+
 export interface AgentConfig {
   name: string;
+  id?: string;
+  displayName?: string;
+  vendor?: string;
+  scannerType?: string;
+  enabled?: boolean;
+  readOnly?: boolean;
   configDir: string;
   skillsDir: string;
   mcpConfigFile?: string;
   pluginsDir?: string;
+  support?: AgentSupportMetadata;
+}
+
+export interface AgentRegistry {
+  agents: AgentConfig[];
+}
+
+export type AgentDiscoveryStatus = 'confirmed' | 'candidate' | 'missing' | 'unsupported';
+
+export interface AgentDiscoveryCandidate {
+  agentId: string;
+  displayName: string;
+  status: AgentDiscoveryStatus;
+  path?: string;
+  paths?: string[];
+  reason: string;
+  support?: AgentSupportMetadata;
+}
+
+export interface AgentDiscoveryReport {
+  generatedAt: string;
+  candidates: AgentDiscoveryCandidate[];
+}
+
+export interface AgentDiscoverySpec {
+  agentId: string;
+  displayName: string;
+  relativePaths: string[];
+  confirmFiles: string[];
+  confirmFilesByPath?: Record<string, string[]>;
+  manualReviewOnMultipleConfirmed?: boolean;
 }
 
 export interface Skill {
@@ -92,11 +131,14 @@ export interface SyncPlan {
 
 export interface SyncAction {
   id: string;
-  type: 'copy-to-canonical' | 'link-to-agent' | 'copy-to-agent' | 'skip' | 'manual-review';
+  type: 'promote-canonical' | 'distribute' | 'repair-metadata' | 'dedupe' | 'skip' | 'manual-review';
   skillId: string;
   agentName?: string;
   sourcePath?: string;
   targetPath?: string;
+  sourceKind?: 'canonical-store' | 'agent-install' | 'external-import' | 'unknown';
+  targetKind?: 'canonical-store' | 'agent-install' | 'unknown';
+  mode?: 'symlink' | 'copy';
   reason: string;
   requiresWrite: boolean;
 }
@@ -126,4 +168,28 @@ export interface ProfilePlanAction {
   targetId: string;
   reason: string;
   requiresWrite: boolean;
+}
+
+export type CapabilityPresence = 'present' | 'missing';
+
+export interface CapabilityMatrixRow {
+  capabilityId: string;
+  capabilityType: 'skill' | 'mcp-server';
+  presentAgents: string[];
+  missingAgents: string[];
+  agentStates: Record<string, CapabilityPresence>;
+  isShared: boolean;
+}
+
+export interface CapabilityMatrix {
+  generatedAt: string;
+  agents: string[];
+  skills: CapabilityMatrixRow[];
+  mcpServers: CapabilityMatrixRow[];
+  summary: {
+    totalSkillCapabilities: number;
+    totalMcpCapabilities: number;
+    sharedSkills: number;
+    sharedMcps: number;
+  };
 }

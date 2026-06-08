@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Local-first CLI for scanning, auditing, planning, and synchronizing MCP servers and agent skills across Claude Code, OpenCode, and Codex.**
+**Local-first CLI for scanning, auditing, planning, and synchronizing agent skills while inventorying MCP servers across Claude Code, OpenCode, and Codex.**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -12,7 +12,7 @@
 
 [中文文档](README.zh-CN.md) · **English**
 
-[Quickstart](#quickstart) · [Outputs](#outputs) · [Commands](#commands) · [Scenarios](#scenarios) · [Profiles](#profiles) · [Safety](#safety-model) · [Boundaries](#boundaries)
+[Quickstart](#quickstart) · [Outputs](#outputs) · [Commands](#commands) · [Scenarios](#scenarios) · [Supported Agents](docs/supported-agents.md) · [Profiles](#profiles) · [Safety](#safety-model) · [Boundaries](#boundaries)
 
 </div>
 
@@ -22,7 +22,9 @@
 
 MCPskills Center gives one local machine a clear control surface for agent capabilities that are usually scattered across multiple tools.
 
-It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run sync plans, checks health status, and renders readable reports for review.
+It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run skill sync plans, checks health status, and renders readable reports for review.
+
+The product direction is CLI-first. The CLI remains the governance kernel and operational source of truth for scan, plan, apply, and restore. A local Web console can wrap these artifacts later, but it should not replace the CLI execution model.
 
 ```text
 Claude Code config ─┐
@@ -45,6 +47,18 @@ The current release focuses on a practical local workflow:
 | Profiles | Read-only planning for scenario-based capability bundles such as `coding` or `research` |
 | Health checks | Passive validation by default, explicit active command probing when allowlisted |
 | Dashboard | Static offline HTML report at `reports/dashboard.html` |
+
+Agent support status is summarized in `docs/supported-agents.md`.
+
+---
+
+## Governance Roadmap
+
+Current priority is skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
+
+MCP governance is next. MCP sources stay report-first until their source-of-truth model, write boundaries, backup behavior, and restore semantics are proven.
+
+Longer-term layers are a local Web control plane over the CLI kernel, then intelligent local agent routing after governed capability state is stable. Web, SQLite history, and routing are intentionally not the first implementation priority.
 
 ---
 
@@ -92,6 +106,11 @@ node dist/index.js sync --dry-run
 - `reports/sync-plan-current.json`
 - `reports/sync-plan-current.md`
 
+`matrix` writes:
+
+- `reports/capability-matrix-current.json`
+- `reports/capability-matrix-current.md`
+
 `sync --apply --confirm` writes timestamped backup content under `backups/` and a consolidated manifest for the apply run.
 
 ### Dashboard preview
@@ -120,6 +139,9 @@ Generated HTML is a reading surface. The JSON and Markdown reports remain the au
 | `node dist/index.js profile list` | List available local profiles | None |
 | `node dist/index.js profile show <name>` | Print one profile JSON | None |
 | `node dist/index.js profile plan <name>` | Compare a profile against the current inventory | None |
+| `node dist/index.js agents list` | List registered local agents from `config/agents.json` | None |
+| `node dist/index.js agents discover` | Discover local agent config candidates such as Qoder, CodeBuddy, WorkBuddy, and Trae | `reports/` |
+| `node dist/index.js matrix` | Build a capability matrix across registered agents for discovered skills and MCP servers | `reports/` |
 | `node dist/index.js health` | Run passive MCP health checks | None |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | Run explicit active command probes for allowlisted commands | None |
 | `node dist/index.js help` | Show CLI help | None |
@@ -184,7 +206,31 @@ node dist/index.js profile plan coding
 
 This reports `already-present`, `missing`, and `disable` actions for the named profile without changing any live config.
 
-### 7. Run safe passive MCP health checks
+### 7. List registered local agents
+
+```bash
+node dist/index.js agents list
+```
+
+Use this to review the currently loaded registry without scanning live config. The checked-in `config/agents.json` also contains disabled read-only entries for Qoder, Qoder Work, CodeBuddy, WorkBuddy, and Trae, but disabled entries are filtered out of the runtime-loaded list.
+
+### 8. Discover local agent candidates
+
+```bash
+node dist/index.js agents discover
+```
+
+Discovery is read-only. It checks known local paths and writes `reports/agent-discovery-current.json` plus `reports/agent-discovery-current.md`.
+
+### 9. Build a cross-agent capability matrix
+
+```bash
+node dist/index.js matrix
+```
+
+Use this when you want a cross-agent capability view for the current inventory. It writes `reports/capability-matrix-current.json` and `reports/capability-matrix-current.md` with per-agent presence, missing coverage, and shared-capability counts.
+
+### 10. Run safe passive MCP health checks
 
 ```bash
 node dist/index.js health
@@ -192,7 +238,7 @@ node dist/index.js health
 
 Passive mode checks transport shape, command presence, URL validity, and sensitive env key risk without spawning commands.
 
-### 8. Run explicit active command probes
+### 11. Run explicit active command probes
 
 ```bash
 node dist/index.js health --active --allow-command npx --timeout 3000

@@ -1,0 +1,90 @@
+{
+  "agents": [
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "vendor": "Anthropic",
+      "scannerType": "claude-code",
+      "enabled": true,
+      "readOnly": false,
+      "configDir": "~/.claude",
+      "skillsDir": "~/.claude/skills",
+      "mcpConfigFile": "~/.claude.json"
+    },
+    {
+      "id": "opencode",
+      "displayName": "OpenCode",
+      "vendor": "OpenCode",
+      "scannerType": "opencode",
+      "enabled": true,
+      "readOnly": false,
+      "configDir": "~/.opencode",
+      "skillsDir": "~/.opencode/skills",
+      "mcpConfigFile": "~/.opencode/opencode.json"
+    },
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "vendor": "OpenAI",
+      "scannerType": "codex",
+      "enabled": true,
+      "readOnly": false,
+      "configDir": "~/.codex",
+      "skillsDir": "~/.codex/skills",
+      "mcpConfigFile": "~/.codex/config.toml"
+    },
+    {
+      "id": "qoder",
+      "displayName": "Qoder",
+      "vendor": "Qoder",
+      "scannerType": "generic",
+      "enabled": false,
+      "readOnly": true,
+      "configDir": "~/.qoder",
+      "skillsDir": "~/.qoder/skills"
+    },
+    {
+      "id": "qoder-work",
+      "displayName": "Qoder Work",
+      "vendor": "Qoder",
+      "scannerType": "generic",
+      "enabled": false,
+      "readOnly": true,
+      "configDir": "~/.qoderworkcn",
+      "skillsDir": "~/.qoderworkcn/skills"
+    },
+    {
+      "id": "codebuddy",
+      "displayName": "CodeBuddy",
+      "vendor": "CodeBuddy",
+      "scannerType": "codebuddy",
+      "enabled": false,
+      "readOnly": true,
+      "configDir": "~/.codebuddy",
+      "skillsDir": "~/.codebuddy/skills-marketplace/skills",
+      "mcpConfigFile": "~/.codebuddy/mcp.json"
+    },
+    {
+      "id": "workbuddy",
+      "displayName": "WorkBuddy",
+      "vendor": "WorkBuddy",
+      "scannerType": "workbuddy",
+      "enabled": false,
+      "readOnly": true,
+      "configDir": "~/.workbuddy",
+      "skillsDir": "~/.workbuddy/skills",
+      "mcpConfigFile": "~/.workbuddy/.mcp.json"
+    },
+    {
+      "id": "trae",
+      "displayName": "Trae",
+      "vendor": "Trae",
+      "scannerType": "trae",
+      "enabled": false,
+      "readOnly": true,
+      "configDir": "~/.trae",
+      "skillsDir": "~/.trae/skills",
+      "mcpConfigFile": "~/AppData/Roaming/Trae/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+    }
+  ]
+}

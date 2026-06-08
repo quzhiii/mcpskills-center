@@ -1,12 +1,15 @@
 import { join } from 'node:path';
+import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
+import { buildCapabilityMatrix } from '../matrix/capability.js';
 import { normalizeInventory } from '../normalizer/index.js';
 import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
+import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
-import type { AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
+import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 
 export interface CommandContext {
@@ -15,11 +18,16 @@ export interface CommandContext {
   backupsDir: string;
   profilesDir: string;
   syncConfigPath: string;
+  agentConfigPath: string;
   approvedSyncRoots: string[];
   runInventory: () => Promise<Inventory>;
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
+  writeCapabilityMatrixReports: (matrix: import('../types/index.js').CapabilityMatrix, reportsDir: string) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
+  listAgents: () => Promise<AgentConfig[]>;
+  discoverAgents: () => Promise<AgentDiscoveryReport>;
+  writeAgentDiscoveryReports: (report: AgentDiscoveryReport, reportsDir: string) => Promise<void>;
   applySyncPlan: typeof applySyncPlan;
   restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
 }
@@ -34,6 +42,10 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeSync(cli, context);
     case 'profile':
       return executeProfile(cli, context);
+    case 'agents':
+      return executeAgents(cli, context);
+    case 'matrix':
+      return executeMatrix(context);
     case 'health':
       return executeHealth(cli, context);
     case 'help':
@@ -54,6 +66,9 @@ export function renderHelp(): string {
     '  profile list                 List local profiles',
     '  profile show <name>          Show a profile JSON',
     '  profile plan <name>          Plan profile changes without writing',
+    '  agents list                  List registered local agents',
+    '  agents discover              Discover local agent config candidates',
+    '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
     '  help                         Show this help',
@@ -106,9 +121,12 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
     const result = await context.restoreSyncBackupManifest(cli.options.restoreManifestPath, {
       approvedRoots: context.approvedSyncRoots,
     });
+    const actionTypes = formatActionTypeCounts(countRestoreActionTypes(result.restoredEntries));
     return [
       'Sync restore complete!',
       `   Restored Entries: ${result.restoredEntries.length}`,
+      `   Restored Targets: ${new Set(result.restoredEntries.map(entry => entry.targetPath)).size}`,
+      `   Action Types: ${actionTypes}`,
       `   Manifest: ${cli.options.restoreManifestPath}`,
     ].join('\n');
   }
@@ -129,17 +147,21 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
       backupsDir: context.backupsDir,
       approvedRoots: context.approvedSyncRoots,
     });
+    const actionTypes = formatActionTypeCounts(countActionTypes(result.appliedActions));
 
     return [
       'Sync apply complete!',
       `   Applied Actions: ${result.appliedActions.length}`,
       `   Backup Entries: ${result.backupEntries.length}`,
+      `   Receipts: ${result.receipts.length}`,
+      `   Action Types: ${actionTypes}`,
       `   Manifest: ${result.manifestPath}`,
     ].join('\n');
   }
 
   await context.writeAllReports(normalized, audit, context.reportsDir);
   await context.writeSyncPlanReports(plan, context.reportsDir);
+  const syncSummary = buildSyncPlanSummary(plan);
 
   return [
     'Sync dry-run complete!',
@@ -147,6 +169,8 @@ async function executeSync(cli: CliArgs, context: CommandContext): Promise<strin
     `   MCP Servers: ${normalized.mcpServers.length}`,
     `   Audit Issues: ${audit.issues.length}`,
     `   Sync Actions: ${plan.actions.length}`,
+    `   Write Actions: ${syncSummary.writeActions}`,
+    `   Action Types: ${formatSyncSummaryActionTypes(syncSummary.actionTypes)}`,
     '',
     `   Reports written to: ${context.reportsDir}`,
   ].join('\n');
@@ -194,6 +218,50 @@ async function executeHealth(cli: CliArgs, context: CommandContext): Promise<str
   return lines.join('\n');
 }
 
+async function executeMatrix(context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const matrix = buildCapabilityMatrix(normalized);
+  await context.writeCapabilityMatrixReports(matrix, context.reportsDir);
+
+  return [
+    'Capability matrix complete!',
+    `   Skill Capabilities: ${matrix.summary.totalSkillCapabilities}`,
+    `   MCP Capabilities: ${matrix.summary.totalMcpCapabilities}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+  ].join('\n');
+}
+
+async function executeAgents(cli: CliArgs, context: CommandContext): Promise<string> {
+  const subcommand = cli.options.subcommand ?? 'list';
+
+  switch (subcommand) {
+    case 'list': {
+      const agents = await context.listAgents();
+      return [
+        'Registered agents:',
+        ...agents.map(agent => {
+          const support = describeAgentSupport(agent.id ?? agent.name);
+          return `   ${agent.id ?? agent.name} - ${agent.displayName ?? agent.name} [scanner: ${agent.scannerType ?? agent.name}, ${agent.enabled === false ? 'disabled' : 'enabled'}, ${agent.readOnly ? 'read-only' : 'write-capable'}, support: ${support.currentLevel}, source-of-truth-confidence: ${support.sourceOfTruthConfidence}]`;
+        }),
+      ].join('\n');
+    }
+    case 'discover': {
+      const report = await context.discoverAgents();
+      await context.writeAgentDiscoveryReports(report, context.reportsDir);
+      return [
+        'Agent discovery complete!',
+        `   Candidates: ${report.candidates.length}`,
+        '',
+        `   Reports written to: ${context.reportsDir}`,
+      ].join('\n');
+    }
+    default:
+      return 'Usage: node dist/index.js agents [list|discover]';
+  }
+}
+
 function findProfile<T extends { name: string }>(profiles: T[], name: string | undefined): T {
   if (!name) throw new Error('Profile name is required');
   const profile = profiles.find(item => item.name === name);
@@ -201,13 +269,41 @@ function findProfile<T extends { name: string }>(profiles: T[], name: string | u
   return profile;
 }
 
-export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'approvedSyncRoots'> {
+function countActionTypes(actions: Array<{ type: string }>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const action of actions) {
+    counts[action.type] = (counts[action.type] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function countRestoreActionTypes(entries: Array<{ actionId: string }>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const entry of entries) {
+    const actionType = entry.actionId.split(':')[0] || 'unknown';
+    counts[actionType] = (counts[actionType] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function formatActionTypeCounts(counts: Record<string, number>): string {
+  const entries = Object.entries(counts);
+  return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count}`).join(', ') : 'none';
+}
+
+function formatSyncSummaryActionTypes(actionTypes: ReturnType<typeof buildSyncPlanSummary>['actionTypes']): string {
+  const entries = Object.entries(actionTypes);
+  return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count.actions}`).join(', ') : 'none';
+}
+
+export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
   return {
     reportsDir: join(dirname, '..', 'reports'),
     canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
     backupsDir: join(dirname, '..', 'backups'),
     profilesDir: join(dirname, '..', 'config', 'profiles'),
     syncConfigPath: join(dirname, '..', 'config', 'sync.json'),
+    agentConfigPath: join(dirname, '..', 'config', 'agents.json'),
     approvedSyncRoots: [
       join(dirname, '..', 'config', 'canonical-skills'),
       'C:/Users/quzhi/.claude/skills',
