@@ -88,9 +88,15 @@ test('renderDashboardHtml includes summary counts and recommendations', () => {
   assert.match(html, /Total MCP Servers/);
   assert.match(html, /Issues/);
   assert.match(html, /Recommendations/);
-  assert.match(html, /<strong>1<\/strong>\s*<span>Total Skills<\/span>/);
+  assert.match(html, /<strong>1<\/strong>\s*<span><span data-lang="en">Total Skills<\/span><span data-lang="zh-CN">技能总数<\/span><\/span>/);
   assert.match(html, /manual-review/);
   assert.match(html, /Review without executing HTML/);
+  assert.match(html, /language-toggle/);
+  assert.match(html, /data-lang="en"/);
+  assert.match(html, /data-lang="zh-CN"/);
+  assert.match(html, /MCPskills Center Dashboard/);
+  assert.match(html, /Agent Support/);
+  assert.match(html, /支持状态|支持的 Agent|Agent Support/);
 });
 
 test('renderDashboardHtml escapes dynamic strings and stays offline', () => {
