@@ -116,6 +116,22 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
         {
           id: 'filesystem',
           agentSources: ['claude-code', 'opencode'],
+          canonicalProfileCandidate: {
+            profileId: 'filesystem',
+            mcpId: 'filesystem',
+            sourceAgentName: 'claude-code',
+            agentNames: ['claude-code', 'opencode'],
+            definition: {
+              transport: 'stdio',
+              command: 'npx',
+              host: undefined,
+              isEnabled: true,
+              canStart: null,
+              hasSensitiveEnv: false,
+            },
+            blockedByEnvRisk: false,
+          },
+          envRiskPolicy: 'no-env-risk-detected',
           definitions: [
             {
               agentName: 'claude-code',
@@ -144,10 +160,11 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
         {
           id: 'memory',
           agentSources: ['claude-code', 'codex'],
+          envRiskPolicy: 'unknown-transport-requires-review',
           definitions: [
             {
               agentName: 'claude-code',
-              transport: 'stdio',
+              transport: 'unknown',
               command: 'npx',
               isEnabled: true,
               canStart: null,
@@ -155,15 +172,15 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
             },
             {
               agentName: 'codex',
-              transport: 'stdio',
-              command: 'node',
+              transport: 'unknown',
+              command: undefined,
               isEnabled: true,
               canStart: null,
               hasSensitiveEnv: false,
             },
           ],
-          transport: 'stdio',
-          command: 'npx',
+          transport: 'unknown',
+          command: undefined,
           isDuplicate: true,
           isEnabled: true,
           canStart: null,
@@ -186,7 +203,10 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
   assert.match(output, /MCP governance dry-run complete!/);
   assert.match(output, /MCP Servers: 2/);
   assert.match(output, /Governance Actions: 2/);
+  assert.match(output, /Canonical Candidates: 1/);
+  assert.match(output, /Manual Review: 1/);
   assert.match(output, /Write Actions: 0/);
+  assert.match(output, /Env Risk Policies: no-env-risk-detected=1, unknown-transport-requires-review=1/);
   assert.match(output, /Action Types: canonical-candidate=1, manual-review=1/);
   assert.match(output, /Reports written to: C:\/reports/);
   assert.deepEqual(writes, ['mcp-governance-plan']);

@@ -5,8 +5,11 @@ import type { McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
 export interface McpGovernancePlanSummary {
   totalActions: number;
   writeActions: number;
+  canonicalCandidates: number;
+  manualReviewActions: number;
   actionTypes: Record<string, McpGovernancePlanSummaryCount>;
   agentImpact: Record<string, McpGovernancePlanSummaryCount>;
+  envRiskPolicies: Record<string, number>;
 }
 
 export interface McpGovernancePlanSummaryCount {
@@ -19,12 +22,18 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
   const summary: McpGovernancePlanSummary = {
     totalActions: plan.actions.length,
     writeActions: plan.actions.filter(action => action.requiresWrite).length,
+    canonicalCandidates: 0,
+    manualReviewActions: 0,
     actionTypes: {},
     agentImpact: {},
+    envRiskPolicies: {},
   };
 
   for (const action of plan.actions) {
     incrementSummary(summary.actionTypes, action.type, action);
+    if (action.type === 'canonical-candidate') summary.canonicalCandidates += 1;
+    if (action.type === 'manual-review') summary.manualReviewActions += 1;
+    summary.envRiskPolicies[action.envRiskPolicy] = (summary.envRiskPolicies[action.envRiskPolicy] ?? 0) + 1;
     for (const agentName of action.agentNames) {
       incrementSummary(summary.agentImpact, agentName, action);
     }
