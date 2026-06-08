@@ -319,6 +319,15 @@ test('executeCommand handles sync apply through injected dependencies', async ()
         },
       ],
       backupEntries: [],
+      receipts: [
+        {
+          actionId: 'distribute:skill-a:0',
+          type: 'distribute',
+          skillId: 'skill-a',
+          targetPath: 'C:/agent/skill-a',
+          appliedAt: '2026-06-03T00:00:00.000Z',
+        },
+      ],
     }),
     restoreSyncBackupManifest: async () => ({ restoredEntries: [] }),
   });
@@ -345,7 +354,7 @@ test('executeCommand handles sync restore through injected dependencies', async 
     listAgents: async () => agents,
     discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
     writeAgentDiscoveryReports: async () => undefined,
-    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [] }),
+    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
     restoreSyncBackupManifest: async () => ({
       restoredEntries: [
         {

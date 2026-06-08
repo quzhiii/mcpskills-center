@@ -112,6 +112,38 @@ test('restoreSyncBackupManifest fully reverts an apply run', async () => {
   await assert.rejects(() => access(join(targetPath, 'NEW_ONLY.md')));
 });
 
+test('restoreSyncBackupManifest restores manifests created by refined promote-canonical actions', async () => {
+  const root = await makeTempRoot();
+  const targetPath = join(root, 'canonical', 'skill-one');
+  const backupPath = join(root, 'backups', 'promote-canonical-skill-one-0-skill-one');
+  const manifestPath = join(root, 'backups', 'manifest.json');
+
+  await mkdir(targetPath, { recursive: true });
+  await mkdir(backupPath, { recursive: true });
+  await writeFile(join(targetPath, 'SKILL.md'), 'promoted content', 'utf-8');
+  await writeFile(join(backupPath, 'SKILL.md'), 'previous canonical content', 'utf-8');
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      generatedAt: '2026-06-03T00:00:00.000Z',
+      entries: [
+        {
+          actionId: 'promote-canonical:skill-one:0',
+          targetPath,
+          backupPath,
+          capturedAt: '2026-06-03T00:00:00.000Z',
+        },
+      ],
+    }),
+    'utf-8'
+  );
+
+  const result = await restoreSyncBackupManifest(manifestPath, { approvedRoots: [join(root, 'canonical')] });
+
+  assert.equal(result.restoredEntries[0].actionId, 'promote-canonical:skill-one:0');
+  assert.equal(await readFile(join(targetPath, 'SKILL.md'), 'utf-8'), 'previous canonical content');
+});
+
 test('restoreSyncBackupManifest refuses target paths outside approved roots', async () => {
   const root = await makeTempRoot();
   const approvedRoot = join(root, 'approved');

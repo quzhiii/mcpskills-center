@@ -13,6 +13,16 @@ export interface ApplySyncPlanResult {
   manifestPath: string;
   appliedActions: SyncAction[];
   backupEntries: SyncBackupEntry[];
+  receipts: SyncApplyReceipt[];
+}
+
+export interface SyncApplyReceipt {
+  actionId: string;
+  type: SyncAction['type'];
+  skillId: string;
+  targetPath: string;
+  backupPath?: string;
+  appliedAt: string;
 }
 
 export async function applySyncPlan(plan: SyncPlan, options: ApplySyncPlanOptions): Promise<ApplySyncPlanResult> {
@@ -20,22 +30,28 @@ export async function applySyncPlan(plan: SyncPlan, options: ApplySyncPlanOption
     throw new Error('Applying a sync plan requires --confirm');
   }
 
-  const writeActions = plan.actions.filter(action => action.requiresWrite && isWriteAction(action.type));
+  const writeActions = getSupportedWriteActions(plan.actions);
   const backupEntries: SyncBackupEntry[] = [];
+  const receipts: SyncApplyReceipt[] = [];
   const generatedAt = new Date().toISOString();
   const backupDir = join(options.backupsDir, generatedAt.replace(/[:.]/g, '-'));
   const manifestPath = join(backupDir, 'manifest.json');
+
+  assertUniqueWriteTargets(writeActions);
 
   try {
     for (const action of writeActions) {
       assertActionPathsWithinApprovedRoots(action, options.approvedRoots);
 
+      let backupPath: string | undefined;
       if (action.targetPath && await pathExists(action.targetPath)) {
         const backupEntry = await createBackupEntry(action, backupDir, generatedAt);
         backupEntries.push(backupEntry);
+        backupPath = backupEntry.backupPath;
       }
 
       await applyAction(plan, action);
+      receipts.push(createReceipt(action, generatedAt, backupPath));
     }
   } finally {
     if (backupEntries.length > 0) {
@@ -51,6 +67,45 @@ export async function applySyncPlan(plan: SyncPlan, options: ApplySyncPlanOption
     manifestPath,
     appliedActions: writeActions,
     backupEntries,
+    receipts,
+  };
+}
+
+function getSupportedWriteActions(actions: SyncAction[]): SyncAction[] {
+  const writeActions = actions.filter(action => action.requiresWrite);
+  const unsupportedAction = writeActions.find(action => !isWriteAction(action.type));
+  if (unsupportedAction) {
+    throw new Error(`Unsupported sync write action: ${unsupportedAction.type} (${unsupportedAction.id})`);
+  }
+
+  return writeActions;
+}
+
+function assertUniqueWriteTargets(actions: SyncAction[]): void {
+  const seen = new Map<string, SyncAction>();
+  for (const action of actions) {
+    if (!action.targetPath) continue;
+    const normalizedTarget = resolve(action.targetPath).toLowerCase();
+    const previous = seen.get(normalizedTarget);
+    if (previous) {
+      throw new Error(`Ambiguous sync target shared by ${previous.id} and ${action.id}: ${action.targetPath}`);
+    }
+    seen.set(normalizedTarget, action);
+  }
+}
+
+function createReceipt(action: SyncAction, appliedAt: string, backupPath: string | undefined): SyncApplyReceipt {
+  if (!action.targetPath) {
+    throw new Error(`Sync action ${action.id} has no targetPath for receipt`);
+  }
+
+  return {
+    actionId: action.id,
+    type: action.type,
+    skillId: action.skillId,
+    targetPath: action.targetPath,
+    backupPath,
+    appliedAt,
   };
 }
 

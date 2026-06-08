@@ -166,6 +166,134 @@ test('applySyncPlan writes one consolidated manifest for multiple backups', asyn
   assert.equal(manifest.entries.length, 2);
 });
 
+test('applySyncPlan records receipts for every executed write action', async () => {
+  const root = await makeTempRoot();
+  const canonicalRoot = join(root, 'canonical');
+  const agentRoot = join(root, 'agent');
+  const backupsDir = join(root, 'backups');
+  const sourcePath = join(canonicalRoot, 'duplicate-skill');
+  const targetPath = join(agentRoot, 'duplicate-skill');
+
+  await mkdir(sourcePath, { recursive: true });
+  await mkdir(targetPath, { recursive: true });
+  await writeFile(join(sourcePath, 'SKILL.md'), 'new content', 'utf-8');
+  await writeFile(join(targetPath, 'SKILL.md'), 'old content', 'utf-8');
+
+  const result = await applySyncPlan({
+    generatedAt: '2026-06-03T00:00:00.000Z',
+    canonicalSkillsDir: canonicalRoot,
+    strategy: 'copy',
+    actions: [
+      {
+        id: 'distribute:duplicate-skill:0',
+        type: 'distribute',
+        skillId: 'duplicate-skill',
+        sourcePath,
+        targetPath,
+        mode: 'copy',
+        reason: 'Distribute canonical skill to the agent install as a copy',
+        requiresWrite: true,
+      },
+    ],
+  }, {
+    confirm: true,
+    backupsDir,
+    approvedRoots: [canonicalRoot, agentRoot],
+  });
+
+  assert.equal(result.receipts.length, 1);
+  assert.equal(result.receipts[0].actionId, 'distribute:duplicate-skill:0');
+  assert.equal(result.receipts[0].type, 'distribute');
+  assert.equal(result.receipts[0].skillId, 'duplicate-skill');
+  assert.equal(result.receipts[0].targetPath, targetPath);
+  assert.equal(result.receipts[0].backupPath, result.backupEntries[0].backupPath);
+});
+
+test('applySyncPlan refuses unsupported write action types instead of silently skipping them', async () => {
+  const root = await makeTempRoot();
+  const canonicalRoot = join(root, 'canonical');
+  const agentRoot = join(root, 'agent');
+  const skillPath = join(agentRoot, 'skill-one');
+  await mkdir(skillPath, { recursive: true });
+
+  await assert.rejects(
+    () => applySyncPlan({
+      generatedAt: '2026-06-03T00:00:00.000Z',
+      canonicalSkillsDir: canonicalRoot,
+      strategy: 'copy',
+      actions: [
+        {
+          id: 'repair-metadata:skill-one:0',
+          type: 'repair-metadata',
+          skillId: 'skill-one',
+          sourcePath: skillPath,
+          targetPath: skillPath,
+          reason: 'Repair invalid metadata after manual review',
+          requiresWrite: true,
+        },
+      ],
+    }, {
+      confirm: true,
+      backupsDir: join(root, 'backups'),
+      approvedRoots: [canonicalRoot, agentRoot],
+    }),
+    /Unsupported sync write action/
+  );
+});
+
+test('applySyncPlan refuses ambiguous duplicate targets before writing', async () => {
+  const root = await makeTempRoot();
+  const canonicalRoot = join(root, 'canonical');
+  const agentRoot = join(root, 'agent');
+  const sourceOne = join(canonicalRoot, 'skill-one');
+  const sourceTwo = join(canonicalRoot, 'skill-two');
+  const targetPath = join(agentRoot, 'shared-target');
+
+  await mkdir(sourceOne, { recursive: true });
+  await mkdir(sourceTwo, { recursive: true });
+  await mkdir(targetPath, { recursive: true });
+  await writeFile(join(sourceOne, 'SKILL.md'), 'new one', 'utf-8');
+  await writeFile(join(sourceTwo, 'SKILL.md'), 'new two', 'utf-8');
+  await writeFile(join(targetPath, 'SKILL.md'), 'old content', 'utf-8');
+
+  await assert.rejects(
+    () => applySyncPlan({
+      generatedAt: '2026-06-03T00:00:00.000Z',
+      canonicalSkillsDir: canonicalRoot,
+      strategy: 'copy',
+      actions: [
+        {
+          id: 'distribute:skill-one:0',
+          type: 'distribute',
+          skillId: 'skill-one',
+          sourcePath: sourceOne,
+          targetPath,
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
+          requiresWrite: true,
+        },
+        {
+          id: 'distribute:skill-two:1',
+          type: 'distribute',
+          skillId: 'skill-two',
+          sourcePath: sourceTwo,
+          targetPath,
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
+          requiresWrite: true,
+        },
+      ],
+    }, {
+      confirm: true,
+      backupsDir: join(root, 'backups'),
+      approvedRoots: [canonicalRoot, agentRoot],
+    }),
+    /Ambiguous sync target/
+  );
+
+  assert.equal(await readFile(join(targetPath, 'SKILL.md'), 'utf-8'), 'old content');
+});
+
 test('applySyncPlan writes manifest for completed backups when a later action fails', async () => {
   const root = await makeTempRoot();
   const canonicalRoot = join(root, 'canonical');
