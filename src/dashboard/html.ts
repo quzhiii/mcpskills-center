@@ -125,8 +125,8 @@ function renderSkillsTable(skills: Inventory['skills']): string {
     <tr>
       <td>${escapeHtml(skill.id)}</td>
       <td>${escapeHtml(String(skill.agentInstallPaths.length))}</td>
-      <td>${skill.hasSkillMd ? 'yes' : 'no'}</td>
-      <td>${skill.frontmatterValid ? 'yes' : 'no'}</td>
+      <td>${renderBooleanText(skill.hasSkillMd)}</td>
+      <td>${renderBooleanText(skill.frontmatterValid)}</td>
     </tr>`).join('');
 
   return `<table>
@@ -143,8 +143,8 @@ function renderAgentSupportTable(agents: Inventory['agents']): string {
     <tr>
       <td>${escapeHtml(agent.id ?? agent.name)}</td>
       <td>${escapeHtml(agent.scannerType ?? agent.name)}</td>
-      <td>${escapeHtml(resolveAgentSupport(agent).currentLevel)}</td>
-      <td>${escapeHtml(resolveAgentSupport(agent).sourceOfTruthConfidence)}</td>
+      <td>${renderDualText(resolveAgentSupport(agent).currentLevel, translateSupportLevel(resolveAgentSupport(agent).currentLevel))}</td>
+      <td>${renderDualText(resolveAgentSupport(agent).sourceOfTruthConfidence, translateConfidence(resolveAgentSupport(agent).sourceOfTruthConfidence))}</td>
     </tr>`).join('');
 
   return `<table>
@@ -159,11 +159,11 @@ function renderRecommendationsTable(recommendations: AuditReport['recommendation
 
   const rows = recommendations.map(recommendation => `
     <tr>
-      <td>${escapeHtml(recommendation.category)}</td>
+      <td>${renderDualText(recommendation.category, translateRecommendationCategory(recommendation.category))}</td>
       <td>${escapeHtml(`${recommendation.targetType}: ${recommendation.targetId}`)}</td>
-      <td><span class="pill severity-${escapeHtml(recommendation.severity)}">${escapeHtml(recommendation.severity)}</span></td>
-      <td>${recommendation.requiresWrite ? 'yes' : 'no'}</td>
-      <td>${escapeHtml(recommendation.suggestedAction)}</td>
+      <td><span class="pill severity-${escapeHtml(recommendation.severity)}">${renderDualText(recommendation.severity, translateSeverity(recommendation.severity))}</span></td>
+      <td>${renderBooleanText(recommendation.requiresWrite)}</td>
+      <td>${renderDualText(recommendation.suggestedAction, translateSuggestedAction(recommendation.suggestedAction))}</td>
     </tr>`).join('');
 
   return `<table>
@@ -180,7 +180,7 @@ function renderIssuesTable(issues: AuditReport['issues']): string {
     <tr>
       <td>${escapeHtml(issue.type)}</td>
       <td>${escapeHtml(issue.item)}</td>
-      <td><span class="pill severity-${escapeHtml(issue.severity)}">${escapeHtml(issue.severity)}</span></td>
+      <td><span class="pill severity-${escapeHtml(issue.severity)}">${renderDualText(issue.severity, translateSeverity(issue.severity))}</span></td>
       <td>${escapeHtml(issue.description)}</td>
     </tr>`).join('');
 
@@ -198,4 +198,71 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function renderDualText(labelEn: string, labelZh: string): string {
+  return `<span data-lang="en">${escapeHtml(labelEn)}</span><span data-lang="zh-CN">${escapeHtml(labelZh)}</span>`;
+}
+
+function renderBooleanText(value: boolean): string {
+  return renderDualText(value ? 'yes' : 'no', value ? '是' : '否');
+}
+
+function translateSeverity(severity: string): string {
+  switch (severity) {
+    case 'error':
+      return '错误';
+    case 'warning':
+      return '警告';
+    case 'info':
+      return '提示';
+    default:
+      return severity;
+  }
+}
+
+function translateConfidence(confidence: string): string {
+  switch (confidence) {
+    case 'high':
+      return '高';
+    case 'medium':
+      return '中';
+    case 'low':
+      return '低';
+    default:
+      return confidence;
+  }
+}
+
+function translateRecommendationCategory(category: string): string {
+  switch (category) {
+    case 'manual-review':
+      return '人工复核';
+    case 'merge':
+      return '合并';
+    case 'remove':
+      return '移除';
+    default:
+      return category;
+  }
+}
+
+function translateSuggestedAction(action: string): string {
+  switch (action) {
+    case 'Review without executing HTML':
+      return '在不执行 HTML 的前提下检查';
+    default:
+      return action;
+  }
+}
+
+function translateSupportLevel(level: string): string {
+  switch (level) {
+    case 'dedicated read-only plus write-ready workflow support':
+      return '专用只读扫描，外加可写工作流支持';
+    case 'undocumented/unknown':
+      return '未文档化/未知';
+    default:
+      return level;
+  }
 }

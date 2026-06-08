@@ -97,6 +97,9 @@ test('renderDashboardHtml includes summary counts and recommendations', () => {
   assert.match(html, /MCPskills Center Dashboard/);
   assert.match(html, /Agent Support/);
   assert.match(html, /支持状态|支持的 Agent|Agent Support/);
+  assert.match(html, /<span data-lang="en">no<\/span><span data-lang="zh-CN">否<\/span>/);
+  assert.match(html, /<span data-lang="en">warning<\/span><span data-lang="zh-CN">警告<\/span>/);
+  assert.match(html, /<span data-lang="en">Review without executing HTML<\/span><span data-lang="zh-CN">在不执行 HTML 的前提下检查<\/span>/);
 });
 
 test('renderDashboardHtml escapes dynamic strings and stays offline', () => {
