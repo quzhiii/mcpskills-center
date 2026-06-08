@@ -81,6 +81,22 @@ export interface MCPServerDefinition {
   hasSensitiveEnv: boolean;
 }
 
+export interface McpGovernancePlan {
+  generatedAt: string;
+  actions: McpGovernanceAction[];
+}
+
+export interface McpGovernanceAction {
+  id: string;
+  type: 'canonical-candidate' | 'skip' | 'manual-review';
+  mcpId: string;
+  agentNames: string[];
+  canonicalAgentName?: string;
+  definitions?: MCPServerDefinition[];
+  reason: string;
+  requiresWrite: false;
+}
+
 export interface Profile {
   name: string;
   description: string;
