@@ -3,13 +3,15 @@ import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
 import { buildCapabilityMatrix } from '../matrix/capability.js';
+import { planMcpGovernance } from '../mcp/planner.js';
+import { buildMcpGovernancePlanSummary } from '../mcp/reporter.js';
 import { normalizeInventory } from '../normalizer/index.js';
 import { planProfile } from '../profiles/planner.js';
 import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
 import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
-import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, Profile, SyncPlan } from '../types/index.js';
+import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 
 export interface CommandContext {
@@ -24,6 +26,7 @@ export interface CommandContext {
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
   writeCapabilityMatrixReports: (matrix: import('../types/index.js').CapabilityMatrix, reportsDir: string) => Promise<void>;
+  writeMcpGovernancePlanReports?: (plan: McpGovernancePlan, reportsDir: string) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
   listAgents: () => Promise<AgentConfig[]>;
   discoverAgents: () => Promise<AgentDiscoveryReport>;
@@ -44,6 +47,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeProfile(cli, context);
     case 'agents':
       return executeAgents(cli, context);
+    case 'mcp':
+      return executeMcp(cli, context);
     case 'matrix':
       return executeMatrix(context);
     case 'health':
@@ -68,10 +73,39 @@ export function renderHelp(): string {
     '  profile plan <name>          Plan profile changes without writing',
     '  agents list                  List registered local agents',
     '  agents discover              Discover local agent config candidates',
+    '  mcp plan                     Generate MCP governance dry-run plan and reports',
     '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
     '  help                         Show this help',
+  ].join('\n');
+}
+
+async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string> {
+  const subcommand = cli.options.subcommand ?? 'plan';
+
+  if (subcommand !== 'plan') {
+    return 'Usage: node dist/index.js mcp plan';
+  }
+
+  if (!context.writeMcpGovernancePlanReports) {
+    throw new Error('MCP governance plan report writer is not configured');
+  }
+
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const plan = planMcpGovernance(normalized);
+  await context.writeMcpGovernancePlanReports(plan, context.reportsDir);
+  const summary = buildMcpGovernancePlanSummary(plan);
+
+  return [
+    'MCP governance dry-run complete!',
+    `   MCP Servers: ${normalized.mcpServers.length}`,
+    `   Governance Actions: ${plan.actions.length}`,
+    `   Write Actions: ${summary.writeActions}`,
+    `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
   ].join('\n');
 }
 
@@ -292,6 +326,11 @@ function formatActionTypeCounts(counts: Record<string, number>): string {
 }
 
 function formatSyncSummaryActionTypes(actionTypes: ReturnType<typeof buildSyncPlanSummary>['actionTypes']): string {
+  const entries = Object.entries(actionTypes);
+  return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count.actions}`).join(', ') : 'none';
+}
+
+function formatMcpSummaryActionTypes(actionTypes: ReturnType<typeof buildMcpGovernancePlanSummary>['actionTypes']): string {
   const entries = Object.entries(actionTypes);
   return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count.actions}`).join(', ') : 'none';
 }

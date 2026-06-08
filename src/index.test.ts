@@ -31,6 +31,13 @@ test('parseCliArgs parses agents list command', () => {
   assert.equal(parsed.options.subcommand, 'list');
 });
 
+test('parseCliArgs parses mcp plan command', () => {
+  const parsed = parseCliArgs(['mcp', 'plan']);
+
+  assert.equal(parsed.command, 'mcp');
+  assert.equal(parsed.options.subcommand, 'plan');
+});
+
 test('parseCliArgs parses matrix command', () => {
   const parsed = parseCliArgs(['matrix']);
 
