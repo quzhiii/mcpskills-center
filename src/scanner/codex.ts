@@ -1,7 +1,7 @@
 import { readdir, readFile, stat, lstat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
-import { parseTomlConfig } from '../config/parse.js';
+import { parseCodexMcpConfig } from '../mcp/adapters/codex.js';
 import type { Skill, MCPServer } from '../types/index.js';
 
 export class CodexScanner extends BaseScanner {
@@ -59,41 +59,29 @@ export class CodexScanner extends BaseScanner {
   }
 
   async scanMCP(): Promise<MCPServer[]> {
-    const servers: MCPServer[] = [];
     const mcpFile = this.agentConfig.mcpConfigFile;
 
     if (!mcpFile) {
-      return servers;
+      return [];
     }
 
     try {
       const content = await readFile(mcpFile, 'utf-8');
-      const config = parseTomlConfig<Record<string, any>>(content);
-      const mcpServers = config.mcp_servers || {};
-
-      for (const [name, serverConfig] of Object.entries(mcpServers)) {
-        const cfg = serverConfig as Record<string, unknown>;
-        const command = typeof cfg.command === 'string' ? cfg.command : undefined;
-        const host = typeof cfg.url === 'string' ? cfg.url : undefined;
-        const transport = this.detectTransport(cfg);
-
-        servers.push({
-          id: name,
+      return parseCodexMcpConfig(content).map(server => ({
+          id: server.id,
           agentSources: [this.agentConfig.name],
-          transport,
-          command,
-          host,
+          transport: server.transport,
+          command: server.command,
+          host: server.host,
           isDuplicate: false,
-          isEnabled: true,
+          isEnabled: server.isEnabled,
           canStart: null,
-          hasSensitiveEnv: this.checkSensitiveEnv(cfg),
-        });
-      }
+          hasSensitiveEnv: server.hasSensitiveEnv,
+        }));
     } catch (err) {
       console.warn(`Warning: Could not read Codex MCP config: ${mcpFile}`, (err as Error).message);
+      return [];
     }
-
-    return servers;
   }
 
   private validateFrontmatter(content: string): boolean {
@@ -104,23 +92,4 @@ export class CodexScanner extends BaseScanner {
     return fm.includes('name:') && fm.includes('description:');
   }
 
-  private detectTransport(cfg: Record<string, unknown>): 'stdio' | 'http' | 'sse' | 'unknown' {
-    if (cfg.command) return 'stdio';
-    if (cfg.url) {
-      const url = String(cfg.url);
-      if (url.includes('/sse')) return 'sse';
-      return 'http';
-    }
-    return 'unknown';
-  }
-
-  private checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
-    const env = cfg.env as Record<string, string> | undefined;
-    if (!env) return false;
-
-    const sensitiveKeys = ['api_key', 'apikey', 'token', 'secret', 'password', 'auth'];
-    return Object.keys(env).some(key =>
-      sensitiveKeys.some(s => key.toLowerCase().includes(s))
-    );
-  }
 }
