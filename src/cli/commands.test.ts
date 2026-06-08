@@ -308,12 +308,13 @@ test('executeCommand handles sync apply through injected dependencies', async ()
       manifestPath: 'C:/backups/manifest.json',
       appliedActions: [
         {
-          id: 'copy-to-agent:skill-a:0',
-          type: 'copy-to-agent',
+          id: 'distribute:skill-a:0',
+          type: 'distribute',
           skillId: 'skill-a',
           sourcePath: 'C:/canonical/skill-a',
           targetPath: 'C:/agent/skill-a',
-          reason: 'Copy canonical skill contents to the agent install location',
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
           requiresWrite: true,
         },
       ],
@@ -348,7 +349,7 @@ test('executeCommand handles sync restore through injected dependencies', async 
     restoreSyncBackupManifest: async () => ({
       restoredEntries: [
         {
-          actionId: 'copy-to-agent:skill-a:0',
+          actionId: 'distribute:skill-a:0',
           targetPath: 'C:/agent/skill-a',
           backupPath: 'C:/backups/skill-a',
           capturedAt: '2026-06-03T00:00:00.000Z',

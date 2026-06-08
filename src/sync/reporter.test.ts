@@ -10,12 +10,12 @@ test('renderSyncPlanMarkdown renders sync actions', () => {
     strategy: 'symlink',
     actions: [
       {
-        id: 'copy-to-canonical:duplicate-skill:0',
-        type: 'copy-to-canonical',
+        id: 'promote-canonical:duplicate-skill:0',
+        type: 'promote-canonical',
         skillId: 'duplicate-skill',
         sourcePath: 'C:/Users/quzhi/.claude/skills/duplicate-skill',
         targetPath: 'C:/canonical-skills/duplicate-skill',
-        reason: 'Copy one reviewed skill instance into the canonical store',
+        reason: 'Promote one reviewed skill instance into the canonical store',
         requiresWrite: true,
       },
       {
@@ -34,6 +34,6 @@ test('renderSyncPlanMarkdown renders sync actions', () => {
   assert.match(markdown, /Strategy: `symlink`/);
   assert.match(markdown, /Canonical Skills Dir: `C:\/canonical-skills`/);
   assert.match(markdown, /\| Type \| Skill \| Requires Write \| Source \| Target \| Reason \|/);
-  assert.match(markdown, /\| copy-to-canonical \| duplicate-skill \| yes \| `C:\/Users\/quzhi\/.claude\/skills\/duplicate-skill` \| `C:\/canonical-skills\/duplicate-skill` \| Copy one reviewed skill instance into the canonical store \|/);
+  assert.match(markdown, /\| promote-canonical \| duplicate-skill \| yes \| `C:\/Users\/quzhi\/.claude\/skills\/duplicate-skill` \| `C:\/canonical-skills\/duplicate-skill` \| Promote one reviewed skill instance into the canonical store \|/);
   assert.match(markdown, /\| manual-review \| broken-skill \| no \| - \| - \| Skill is missing SKILL.md and must be reviewed before synchronization \|/);
 });

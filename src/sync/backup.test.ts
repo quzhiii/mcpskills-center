@@ -25,13 +25,14 @@ test('backupSyncActionTarget creates backup copy and manifest entry', async () =
   await writeFile(targetPath, 'original skill content', 'utf-8');
 
   const action: SyncAction = {
-    id: 'copy-to-agent:duplicate-skill:0',
-    type: 'copy-to-agent',
+    id: 'distribute:duplicate-skill:0',
+    type: 'distribute',
     skillId: 'duplicate-skill',
     targetPath,
     sourcePath: join(root, 'canonical', 'duplicate-skill', 'SKILL.md'),
+    mode: 'copy',
     requiresWrite: true,
-    reason: 'Copy canonical skill contents to the agent install location',
+    reason: 'Distribute canonical skill to the agent install as a copy',
   };
 
   const result = await backupSyncActionTarget(action, join(root, 'backups'));

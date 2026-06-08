@@ -34,7 +34,7 @@ test('restoreSyncBackupManifest restores overwritten directory contents', async 
       generatedAt: '2026-06-03T00:00:00.000Z',
       entries: [
         {
-          actionId: 'copy-to-agent:duplicate-skill:0',
+          actionId: 'distribute:duplicate-skill:0',
           targetPath,
           backupPath,
           capturedAt: '2026-06-03T00:00:00.000Z',
@@ -84,12 +84,13 @@ test('restoreSyncBackupManifest fully reverts an apply run', async () => {
       strategy: 'copy',
       actions: [
         {
-          id: 'copy-to-agent:duplicate-skill:0',
-          type: 'copy-to-agent',
+          id: 'distribute:duplicate-skill:0',
+          type: 'distribute',
           skillId: 'duplicate-skill',
           sourcePath,
           targetPath,
-          reason: 'Copy canonical skill contents to the agent install location',
+          mode: 'copy',
+          reason: 'Distribute canonical skill to the agent install as a copy',
           requiresWrite: true,
         },
       ],
@@ -127,7 +128,7 @@ test('restoreSyncBackupManifest refuses target paths outside approved roots', as
       generatedAt: '2026-06-03T00:00:00.000Z',
       entries: [
         {
-          actionId: 'copy-to-agent:duplicate-skill:0',
+          actionId: 'distribute:duplicate-skill:0',
           targetPath,
           backupPath,
           capturedAt: '2026-06-03T00:00:00.000Z',

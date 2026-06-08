@@ -60,14 +60,22 @@ async function applyAction(plan: SyncPlan, action: SyncAction): Promise<void> {
   }
 
   switch (action.type) {
-    case 'copy-to-agent':
-    case 'copy-to-canonical':
+    case 'promote-canonical':
       await rm(action.targetPath, { recursive: true, force: true });
       await mkdir(dirname(action.targetPath), { recursive: true });
       await cp(action.sourcePath, action.targetPath, { recursive: true });
       return;
 
-    case 'link-to-agent':
+    case 'distribute':
+      if (action.mode === 'copy') {
+        await rm(action.targetPath, { recursive: true, force: true });
+        await mkdir(dirname(action.targetPath), { recursive: true });
+        await cp(action.sourcePath, action.targetPath, { recursive: true });
+        return;
+      }
+      if (action.mode !== 'symlink') {
+        throw new Error(`Sync action ${action.id} is missing a supported distribution mode`);
+      }
       if (plan.strategy !== 'symlink') {
         throw new Error(`Sync action ${action.id} requires symlink strategy`);
       }
@@ -98,7 +106,7 @@ function normalizeRoot(root: string): string {
 }
 
 function isWriteAction(type: SyncAction['type']): boolean {
-  return type === 'copy-to-agent' || type === 'copy-to-canonical' || type === 'link-to-agent';
+  return type === 'promote-canonical' || type === 'distribute';
 }
 
 async function pathExists(path: string): Promise<boolean> {

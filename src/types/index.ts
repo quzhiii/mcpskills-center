@@ -131,11 +131,14 @@ export interface SyncPlan {
 
 export interface SyncAction {
   id: string;
-  type: 'copy-to-canonical' | 'link-to-agent' | 'copy-to-agent' | 'skip' | 'manual-review';
+  type: 'promote-canonical' | 'distribute' | 'repair-metadata' | 'dedupe' | 'skip' | 'manual-review';
   skillId: string;
   agentName?: string;
   sourcePath?: string;
   targetPath?: string;
+  sourceKind?: 'canonical-store' | 'agent-install' | 'external-import' | 'unknown';
+  targetKind?: 'canonical-store' | 'agent-install' | 'unknown';
+  mode?: 'symlink' | 'copy';
   reason: string;
   requiresWrite: boolean;
 }
