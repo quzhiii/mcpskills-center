@@ -78,6 +78,50 @@ function makeAudit(inventory: Inventory): AuditReport {
   };
 }
 
+function makeRichAudit(inventory: Inventory): AuditReport {
+  return {
+    ...makeAudit(inventory),
+    recommendations: [
+      {
+        category: 'remove',
+        targetType: 'skill',
+        targetId: 'beautiful-html-templates',
+        severity: 'error',
+        reason: 'incomplete skill',
+        suggestedAction: 'Remove the incomplete skill or add a valid SKILL.md after manual review',
+        requiresWrite: true,
+      },
+      {
+        category: 'merge',
+        targetType: 'skill',
+        targetId: 'hv-analysis',
+        severity: 'warning',
+        reason: 'duplicate skill',
+        suggestedAction: 'Plan consolidation through a canonical skills store before changing files',
+        requiresWrite: true,
+      },
+      {
+        category: 'manual-review',
+        targetType: 'mcp-server',
+        targetId: 'global:zai-mcp-server',
+        severity: 'warning',
+        reason: 'sensitive env',
+        suggestedAction: 'Confirm secrets are stored securely and never copied into generated reports',
+        requiresWrite: false,
+      },
+      {
+        category: 'merge',
+        targetType: 'mcp-server',
+        targetId: 'agentmemory',
+        severity: 'info',
+        reason: 'duplicate mcp',
+        suggestedAction: 'Decide whether this MCP should stay duplicated or be managed by a shared profile',
+        requiresWrite: false,
+      },
+    ],
+  };
+}
+
 test('renderDashboardHtml includes summary counts and recommendations', () => {
   const inventory = makeInventory();
   const html = renderDashboardHtml(inventory, makeAudit(inventory));
@@ -100,6 +144,40 @@ test('renderDashboardHtml includes summary counts and recommendations', () => {
   assert.match(html, /<span data-lang="en">no<\/span><span data-lang="zh-CN">否<\/span>/);
   assert.match(html, /<span data-lang="en">warning<\/span><span data-lang="zh-CN">警告<\/span>/);
   assert.match(html, /<span data-lang="en">Review without executing HTML<\/span><span data-lang="zh-CN">在不执行 HTML 的前提下检查<\/span>/);
+  assert.match(html, /<span data-lang="en">Skill<\/span><span data-lang="zh-CN">技能<\/span>/);
+  assert.match(html, /<span data-lang="en">Agent<\/span><span data-lang="zh-CN">代理<\/span>/);
+  assert.match(html, /<span data-lang="en">Scanner<\/span><span data-lang="zh-CN">扫描器<\/span>/);
+  assert.match(html, /<span data-lang="en">SKILL\.md<\/span><span data-lang="zh-CN">说明文件<\/span>/);
+  assert.match(html, /<span data-lang="en">Frontmatter<\/span><span data-lang="zh-CN">元数据<\/span>/);
+});
+
+test('renderDashboardHtml translates known recommendation actions and fallback support copy', () => {
+  const inventory: Inventory = {
+    generatedAt: '2026-06-03T00:00:00.000Z',
+    agents: [
+      {
+        name: 'future-agent',
+        id: 'future-agent',
+        scannerType: 'future',
+        configDir: 'C:/future',
+        skillsDir: 'C:/future/skills',
+        enabled: false,
+        readOnly: true,
+      },
+    ],
+    skills: [],
+    mcpServers: [],
+    profiles: [],
+  };
+
+  const html = renderDashboardHtml(inventory, makeRichAudit(inventory));
+
+  assert.match(html, /<span data-lang="en">undocumented\/unknown<\/span><span data-lang="zh-CN">未文档化\/未知<\/span>/);
+  assert.match(html, /<span data-lang="en">low<\/span><span data-lang="zh-CN">低<\/span>/);
+  assert.match(html, /<span data-lang="en">Remove the incomplete skill or add a valid SKILL\.md after manual review<\/span><span data-lang="zh-CN">移除不完整的 skill，或在人工复核后补齐有效的 SKILL\.md<\/span>/);
+  assert.match(html, /<span data-lang="en">Plan consolidation through a canonical skills store before changing files<\/span><span data-lang="zh-CN">在变更文件前，先基于规范技能仓规划整合<\/span>/);
+  assert.match(html, /<span data-lang="en">Confirm secrets are stored securely and never copied into generated reports<\/span><span data-lang="zh-CN">确认密钥已安全存储，且绝不会被复制进生成报告<\/span>/);
+  assert.match(html, /<span data-lang="en">Decide whether this MCP should stay duplicated or be managed by a shared profile<\/span><span data-lang="zh-CN">决定这个 MCP 是保留重复安装，还是改由共享 profile 管理<\/span>/);
 });
 
 test('renderDashboardHtml escapes dynamic strings and stays offline', () => {

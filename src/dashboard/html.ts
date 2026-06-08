@@ -82,7 +82,7 @@ export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): s
     </section>
 
     <section class="card">
-      <h2><span data-lang="en">Skills</span><span data-lang="zh-CN">Skills</span></h2>
+      <h2><span data-lang="en">Skills</span><span data-lang="zh-CN">技能</span></h2>
       ${renderSkillsTable(skills)}
     </section>
 
@@ -130,7 +130,7 @@ function renderSkillsTable(skills: Inventory['skills']): string {
     </tr>`).join('');
 
   return `<table>
-    <thead><tr><th><span data-lang="en">Skill</span><span data-lang="zh-CN">Skill</span></th><th><span data-lang="en">Installs</span><span data-lang="zh-CN">安装数</span></th><th>SKILL.md</th><th><span data-lang="en">Frontmatter</span><span data-lang="zh-CN">Frontmatter</span></th></tr></thead>
+    <thead><tr><th><span data-lang="en">Skill</span><span data-lang="zh-CN">技能</span></th><th><span data-lang="en">Installs</span><span data-lang="zh-CN">安装数</span></th><th><span data-lang="en">SKILL.md</span><span data-lang="zh-CN">说明文件</span></th><th><span data-lang="en">Frontmatter</span><span data-lang="zh-CN">元数据</span></th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
@@ -148,7 +148,7 @@ function renderAgentSupportTable(agents: Inventory['agents']): string {
     </tr>`).join('');
 
   return `<table>
-    <thead><tr><th><span data-lang="en">Agent</span><span data-lang="zh-CN">Agent</span></th><th><span data-lang="en">Scanner</span><span data-lang="zh-CN">Scanner</span></th><th><span data-lang="en">Support</span><span data-lang="zh-CN">支持级别</span></th><th><span data-lang="en">Source-of-Truth Confidence</span><span data-lang="zh-CN">来源可信度</span></th></tr></thead>
+    <thead><tr><th><span data-lang="en">Agent</span><span data-lang="zh-CN">代理</span></th><th><span data-lang="en">Scanner</span><span data-lang="zh-CN">扫描器</span></th><th><span data-lang="en">Support</span><span data-lang="zh-CN">支持级别</span></th><th><span data-lang="en">Source-of-Truth Confidence</span><span data-lang="zh-CN">来源可信度</span></th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>`;
@@ -251,6 +251,14 @@ function translateSuggestedAction(action: string): string {
   switch (action) {
     case 'Review without executing HTML':
       return '在不执行 HTML 的前提下检查';
+    case 'Remove the incomplete skill or add a valid SKILL.md after manual review':
+      return '移除不完整的 skill，或在人工复核后补齐有效的 SKILL.md';
+    case 'Plan consolidation through a canonical skills store before changing files':
+      return '在变更文件前，先基于规范技能仓规划整合';
+    case 'Confirm secrets are stored securely and never copied into generated reports':
+      return '确认密钥已安全存储，且绝不会被复制进生成报告';
+    case 'Decide whether this MCP should stay duplicated or be managed by a shared profile':
+      return '决定这个 MCP 是保留重复安装，还是改由共享 profile 管理';
     default:
       return action;
   }
