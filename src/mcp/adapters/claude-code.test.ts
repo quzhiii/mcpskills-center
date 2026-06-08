@@ -38,3 +38,18 @@ test('Claude Code adapter parses global and project MCP servers with scope metad
     scope: { kind: 'project', id: 'projectOne' },
   });
 });
+
+test('Claude Code adapter treats array-form command values as stdio', () => {
+  const servers = parseClaudeCodeMcpConfig(
+    JSON.stringify({
+      mcpServers: {
+        fetcher: { command: ['npx', '-y', '@fetcher/mcp'] },
+      },
+    })
+  );
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].id, 'global:fetcher');
+  assert.equal(servers[0].transport, 'stdio');
+  assert.equal(servers[0].command, 'npx');
+});

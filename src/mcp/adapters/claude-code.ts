@@ -1,7 +1,7 @@
 import { parseJsonConfig } from '../../config/parse.js';
-import type { ParsedMcpConfigServer } from './base.js';
+import type { McpConfigAdapter, ParsedMcpConfigServer } from './base.js';
 
-export function parseClaudeCodeMcpConfig(content: string): ParsedMcpConfigServer[] {
+export const parseClaudeCodeMcpConfig: McpConfigAdapter['parse'] = (content: string) => {
   const config = parseJsonConfig<Record<string, unknown>>(content);
   const servers: ParsedMcpConfigServer[] = [];
 
@@ -13,7 +13,7 @@ export function parseClaudeCodeMcpConfig(content: string): ParsedMcpConfigServer
       servers.push({
         id: `${projectId}:${name}`,
         transport: detectTransport(cfg),
-        command: typeof cfg.command === 'string' ? cfg.command : undefined,
+        command: extractCommand(cfg),
         host: typeof cfg.url === 'string' ? cfg.url : undefined,
         isEnabled: true,
         hasSensitiveEnv: checkSensitiveEnv(cfg),
@@ -28,7 +28,7 @@ export function parseClaudeCodeMcpConfig(content: string): ParsedMcpConfigServer
     servers.push({
       id: `global:${name}`,
       transport: detectTransport(cfg),
-      command: typeof cfg.command === 'string' ? cfg.command : undefined,
+      command: extractCommand(cfg),
       host: typeof cfg.url === 'string' ? cfg.url : undefined,
       isEnabled: true,
       hasSensitiveEnv: checkSensitiveEnv(cfg),
@@ -37,7 +37,7 @@ export function parseClaudeCodeMcpConfig(content: string): ParsedMcpConfigServer
   }
 
   return servers;
-}
+};
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -46,11 +46,23 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function detectTransport(cfg: Record<string, unknown>): ParsedMcpConfigServer['transport'] {
-  if (typeof cfg.command === 'string') return 'stdio';
+  if (extractCommand(cfg)) return 'stdio';
   if (typeof cfg.url === 'string') {
     return cfg.url.includes('/sse') ? 'sse' : 'http';
   }
   return 'unknown';
+}
+
+function extractCommand(cfg: Record<string, unknown>): string | undefined {
+  if (typeof cfg.command === 'string') {
+    return cfg.command;
+  }
+
+  if (Array.isArray(cfg.command) && typeof cfg.command[0] === 'string') {
+    return cfg.command[0];
+  }
+
+  return undefined;
 }
 
 function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {

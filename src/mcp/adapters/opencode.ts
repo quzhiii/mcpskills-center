@@ -1,7 +1,7 @@
 import { parseJsonConfig } from '../../config/parse.js';
-import type { ParsedMcpConfigServer } from './base.js';
+import type { McpConfigAdapter, ParsedMcpConfigServer } from './base.js';
 
-export function parseOpenCodeMcpConfig(content: string): ParsedMcpConfigServer[] {
+export const parseOpenCodeMcpConfig: McpConfigAdapter['parse'] = (content: string) => {
   const config = parseJsonConfig<Record<string, unknown>>(content);
   const mcpServers = asRecord(config.mcp);
 
@@ -17,7 +17,7 @@ export function parseOpenCodeMcpConfig(content: string): ParsedMcpConfigServer[]
       scope: { kind: 'global' },
     } satisfies ParsedMcpConfigServer;
   });
-}
+};
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)

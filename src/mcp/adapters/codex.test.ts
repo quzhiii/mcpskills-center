@@ -34,3 +34,14 @@ url = "https://example.com/mcp"
     scope: { kind: 'global' },
   });
 });
+
+test('Codex adapter treats array-form command values as stdio', () => {
+  const servers = parseCodexMcpConfig(`
+[mcp_servers.agentmemory]
+command = ["npx", "-y", "@agentmemory/mcp"]
+`);
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].transport, 'stdio');
+  assert.equal(servers[0].command, 'npx');
+});
