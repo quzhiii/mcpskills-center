@@ -1,7 +1,8 @@
 import { resolveAgentSupport } from '../agents/support.js';
-import type { AuditReport, Inventory } from '../types/index.js';
+import { buildSyncPlanSummary } from '../sync/reporter.js';
+import type { AuditReport, Inventory, SyncPlan } from '../types/index.js';
 
-export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): string {
+export function renderDashboardHtml(inventory: Inventory, audit: AuditReport, syncPlan?: SyncPlan): string {
   const recommendations = audit.recommendations.slice(0, 20);
   const issues = audit.issues.slice(0, 20);
   const skills = inventory.skills.slice(0, 20);
@@ -70,6 +71,8 @@ export function renderDashboardHtml(inventory: Inventory, audit: AuditReport): s
       ${metricCard('Issues', '问题数', audit.issues.length)}
       ${metricCard('Recommendations', '建议数', audit.recommendations.length)}
     </section>
+
+    ${renderSyncPlanSection(syncPlan)}
 
     <section class="card">
       <h2><span data-lang="en">Recommendations</span><span data-lang="zh-CN">建议动作</span></h2>
@@ -173,6 +176,52 @@ function renderRecommendationsTable(recommendations: AuditReport['recommendation
   </table>`;
 }
 
+function renderSyncPlanSection(syncPlan: SyncPlan | undefined): string {
+  if (!syncPlan) return '';
+
+  const summary = buildSyncPlanSummary(syncPlan);
+  const actionRows = Object.entries(summary.actionTypes).map(([actionType, count]) => `
+    <tr>
+      <td>${escapeHtml(actionType)}</td>
+      <td>${escapeHtml(String(count.actions))}</td>
+      <td>${escapeHtml(String(count.writeActions))}</td>
+    </tr>`).join('');
+  const agentRows = Object.entries(summary.agentImpact).map(([agentName, count]) => `
+    <tr>
+      <td>${escapeHtml(agentName)}</td>
+      <td>${escapeHtml(String(count.actions))}</td>
+      <td>${escapeHtml(String(count.writeActions))}</td>
+      <td>${escapeHtml(formatActionTypeCounts(count.actionTypes))}</td>
+    </tr>`).join('');
+  const manualReviewRows = syncPlan.actions
+    .filter(action => action.type === 'manual-review')
+    .map(action => `
+    <tr>
+      <td>${escapeHtml(action.skillId)}</td>
+      <td>${escapeHtml(action.reason)}</td>
+    </tr>`).join('');
+
+  return `<section class="card">
+      <h2><span data-lang="en">Sync Plan</span><span data-lang="zh-CN">同步计划</span></h2>
+      <p><span data-lang="en">${escapeHtml(String(summary.totalActions))} actions, ${escapeHtml(String(summary.writeActions))} writes.</span><span data-lang="zh-CN">${escapeHtml(String(summary.totalActions))} 个动作，${escapeHtml(String(summary.writeActions))} 个写入动作。</span></p>
+      <table>
+        <thead><tr><th><span data-lang="en">Action Type</span><span data-lang="zh-CN">动作类型</span></th><th><span data-lang="en">Actions</span><span data-lang="zh-CN">动作数</span></th><th><span data-lang="en">Writes</span><span data-lang="zh-CN">写入数</span></th></tr></thead>
+        <tbody>${actionRows}
+        </tbody>
+      </table>
+      ${agentRows ? `<h2><span data-lang="en">Agent Impact</span><span data-lang="zh-CN">Agent 影响</span></h2><table>
+        <thead><tr><th>Agent</th><th><span data-lang="en">Actions</span><span data-lang="zh-CN">动作数</span></th><th><span data-lang="en">Writes</span><span data-lang="zh-CN">写入数</span></th><th><span data-lang="en">Action Types</span><span data-lang="zh-CN">动作类型</span></th></tr></thead>
+        <tbody>${agentRows}
+        </tbody>
+      </table>` : ''}
+      ${manualReviewRows ? `<h2><span data-lang="en">Manual Review</span><span data-lang="zh-CN">人工复核</span></h2><table>
+        <thead><tr><th><span data-lang="en">Skill</span><span data-lang="zh-CN">技能</span></th><th><span data-lang="en">Reason</span><span data-lang="zh-CN">原因</span></th></tr></thead>
+        <tbody>${manualReviewRows}
+        </tbody>
+      </table>` : ''}
+    </section>`;
+}
+
 function renderIssuesTable(issues: AuditReport['issues']): string {
   if (issues.length === 0) return '<p><span data-lang="en">No issues found.</span><span data-lang="zh-CN">未发现问题。</span></p>';
 
@@ -189,6 +238,10 @@ function renderIssuesTable(issues: AuditReport['issues']): string {
     <tbody>${rows}
     </tbody>
   </table>`;
+}
+
+function formatActionTypeCounts(counts: Record<string, number>): string {
+  return Object.entries(counts).map(([actionType, count]) => `${actionType}: ${count}`).join(', ');
 }
 
 function escapeHtml(value: string): string {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDashboardHtml } from './html.js';
-import type { AuditReport, Inventory } from '../types/index.js';
+import type { AuditReport, Inventory, SyncPlan } from '../types/index.js';
 
 function makeInventory(): Inventory {
   return {
@@ -122,6 +122,43 @@ function makeRichAudit(inventory: Inventory): AuditReport {
   };
 }
 
+function makeSyncPlan(): SyncPlan {
+  return {
+    generatedAt: '2026-06-08T00:00:00.000Z',
+    canonicalSkillsDir: 'C:/canonical-skills',
+    strategy: 'symlink',
+    actions: [
+      {
+        id: 'promote-canonical:duplicate-skill:0',
+        type: 'promote-canonical',
+        skillId: 'duplicate-skill',
+        sourcePath: 'C:/Users/quzhi/.claude/skills/duplicate-skill',
+        targetPath: 'C:/canonical-skills/duplicate-skill',
+        reason: 'Promote one reviewed skill instance into the canonical store',
+        requiresWrite: true,
+      },
+      {
+        id: 'distribute:duplicate-skill:1',
+        type: 'distribute',
+        skillId: 'duplicate-skill',
+        agentName: 'opencode',
+        sourcePath: 'C:/canonical-skills/duplicate-skill',
+        targetPath: 'C:/Users/quzhi/.opencode/skills/duplicate-skill',
+        mode: 'symlink',
+        reason: 'Distribute canonical skill to the agent install as a symlink',
+        requiresWrite: true,
+      },
+      {
+        id: 'manual-review:broken-skill:2',
+        type: 'manual-review',
+        skillId: 'broken-skill',
+        reason: 'Skill is missing SKILL.md and must be reviewed before synchronization',
+        requiresWrite: false,
+      },
+    ],
+  };
+}
+
 test('renderDashboardHtml includes summary counts and recommendations', () => {
   const inventory = makeInventory();
   const html = renderDashboardHtml(inventory, makeAudit(inventory));
@@ -149,6 +186,20 @@ test('renderDashboardHtml includes summary counts and recommendations', () => {
   assert.match(html, /<span data-lang="en">Scanner<\/span><span data-lang="zh-CN">扫描器<\/span>/);
   assert.match(html, /<span data-lang="en">SKILL\.md<\/span><span data-lang="zh-CN">说明文件<\/span>/);
   assert.match(html, /<span data-lang="en">Frontmatter<\/span><span data-lang="zh-CN">元数据<\/span>/);
+});
+
+test('renderDashboardHtml surfaces latest sync plan governance summary when provided', () => {
+  const inventory = makeInventory();
+  const html = renderDashboardHtml(inventory, makeAudit(inventory), makeSyncPlan());
+
+  assert.match(html, /Sync Plan/);
+  assert.match(html, /同步计划/);
+  assert.match(html, /promote-canonical/);
+  assert.match(html, /distribute/);
+  assert.match(html, /manual-review/);
+  assert.match(html, /opencode/);
+  assert.match(html, /broken-skill/);
+  assert.match(html, /Skill is missing SKILL\.md and must be reviewed before synchronization/);
 });
 
 test('renderDashboardHtml translates known recommendation actions and fallback support copy', () => {
