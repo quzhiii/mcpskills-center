@@ -14,6 +14,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['single-agent'],
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
         scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server is configured in only one agent; no governance action is needed',
@@ -28,6 +29,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['unknown-transport'],
         envRiskPolicy: 'unknown-transport-requires-review',
         scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has unknown transport and must be reviewed before canonicalization',
@@ -42,6 +44,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['sensitive-env'],
         envRiskPolicy: 'sensitive-env-blocks-canonicalization',
         scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
@@ -56,6 +59,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['scope-conflict'],
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
         scopePolicy: 'scope-conflict-requires-review',
         reason: `MCP duplicate definitions have a scope conflict (${describeScopes(definitions)}) and require manual review`,
@@ -70,6 +74,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['definition-drift'],
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
         scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP duplicate definitions drift across agents and require manual review',
@@ -85,6 +90,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
       agentNames,
       canonicalAgentName: agentNames[0],
       canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, definitions, agentNames),
+      canonicalProfileBlockers: [],
       envRiskPolicy: 'no-env-risk-detected',
       scopePolicy: 'no-scope-conflict-detected',
       reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
@@ -105,6 +111,7 @@ function createAction(args: {
   agentNames: string[];
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpGovernanceAction['canonicalProfileCandidate'];
+  canonicalProfileBlockers?: McpGovernanceAction['canonicalProfileBlockers'];
   envRiskPolicy: McpGovernanceAction['envRiskPolicy'];
   scopePolicy: McpGovernanceAction['scopePolicy'];
   reason: string;
@@ -116,6 +123,7 @@ function createAction(args: {
     agentNames: args.agentNames,
     canonicalAgentName: args.canonicalAgentName,
     canonicalProfileCandidate: args.canonicalProfileCandidate,
+    canonicalProfileBlockers: args.canonicalProfileBlockers,
     envRiskPolicy: args.envRiskPolicy,
     scopePolicy: args.scopePolicy,
     definitions: args.definitions,

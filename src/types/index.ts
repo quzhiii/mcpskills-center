@@ -111,6 +111,7 @@ export interface McpGovernanceAction {
   agentNames: string[];
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpCanonicalProfileCandidate;
+  canonicalProfileBlockers?: McpCanonicalProfileBlocker[];
   envRiskPolicy: McpEnvRiskPolicy;
   scopePolicy?: McpScopePolicy;
   definitions?: MCPServerDefinition[];
@@ -124,6 +125,8 @@ export type McpScopePolicy = 'no-scope-conflict-detected' | 'scope-conflict-requ
 
 export type McpCanonicalProfileStatus = 'eligible';
 
+export type McpCanonicalProfileBlocker = 'single-agent' | 'unknown-transport' | 'sensitive-env' | 'scope-conflict' | 'definition-drift';
+
 export interface McpCanonicalProfileCandidate {
   status?: McpCanonicalProfileStatus;
   profileId: string;
@@ -134,7 +137,7 @@ export interface McpCanonicalProfileCandidate {
   scope?: McpAdapterScope;
   envRiskPolicy?: McpEnvRiskPolicy;
   scopePolicy?: McpScopePolicy;
-  blockers?: [];
+  blockers?: McpCanonicalProfileBlocker[];
   blockedByEnvRisk: boolean;
   eligibilityReason?: string;
 }
