@@ -301,6 +301,9 @@ test('executeCommand summarizes scope-aware mcp plan decisions', async () => {
 
   assert.match(output, /Canonical Candidates: 1/);
   assert.match(output, /Manual Review: 1/);
+  assert.match(output, /Canonical Profile Eligible: 1/);
+  assert.match(output, /Canonical Profile Blocked: 1/);
+  assert.match(output, /Canonical Profile Blockers: scope-conflict=1/);
   assert.match(output, /Scope Policies: no-scope-conflict-detected=1, scope-conflict-requires-review=1/);
   assert.deepEqual(writes, ['mcp-governance-plan']);
 });

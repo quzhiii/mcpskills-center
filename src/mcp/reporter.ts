@@ -7,6 +7,9 @@ export interface McpGovernancePlanSummary {
   writeActions: number;
   canonicalCandidates: number;
   manualReviewActions: number;
+  canonicalProfileEligible: number;
+  canonicalProfileBlocked: number;
+  canonicalProfileBlockers: Record<string, number>;
   actionTypes: Record<string, McpGovernancePlanSummaryCount>;
   agentImpact: Record<string, McpGovernancePlanSummaryCount>;
   envRiskPolicies: Record<string, number>;
@@ -24,6 +27,9 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     writeActions: plan.actions.filter(action => action.requiresWrite).length,
     canonicalCandidates: 0,
     manualReviewActions: 0,
+    canonicalProfileEligible: 0,
+    canonicalProfileBlocked: 0,
+    canonicalProfileBlockers: {},
     actionTypes: {},
     agentImpact: {},
     envRiskPolicies: {},
@@ -33,6 +39,13 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     incrementSummary(summary.actionTypes, action.type, action);
     if (action.type === 'canonical-candidate') summary.canonicalCandidates += 1;
     if (action.type === 'manual-review') summary.manualReviewActions += 1;
+    if (action.canonicalProfileCandidate) summary.canonicalProfileEligible += 1;
+    if (action.canonicalProfileBlockers && action.canonicalProfileBlockers.length > 0) {
+      summary.canonicalProfileBlocked += 1;
+      for (const blocker of action.canonicalProfileBlockers) {
+        summary.canonicalProfileBlockers[blocker] = (summary.canonicalProfileBlockers[blocker] ?? 0) + 1;
+      }
+    }
     summary.envRiskPolicies[action.envRiskPolicy] = (summary.envRiskPolicies[action.envRiskPolicy] ?? 0) + 1;
     for (const agentName of action.agentNames) {
       incrementSummary(summary.agentImpact, agentName, action);
