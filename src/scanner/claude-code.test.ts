@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ClaudeCodeScanner } from './claude-code.js';
 import { createTempAgentRoot, withSuppressedConsoleWarn } from './test-utils.js';
-import type { AgentConfig } from '../types/index.js';
+import type { AgentConfig, MCPServer, McpAdapterScope } from '../types/index.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 
@@ -50,8 +50,13 @@ test('Claude Code MCP scanner reads global and project MCP servers', async () =>
   );
   assert.equal(servers.find(server => server.id === 'global:fetcher')?.transport, 'stdio');
   assert.equal(servers.find(server => server.id === 'global:fetcher')?.hasSensitiveEnv, true);
+  assert.deepEqual(firstDefinitionScope(servers.find(server => server.id === 'global:fetcher')), { kind: 'global' });
   assert.equal(servers.find(server => server.id === 'projectOne:reader')?.transport, 'sse');
   assert.equal(servers.find(server => server.id === 'projectOne:reader')?.host, 'https://example.com/sse');
+  assert.deepEqual(firstDefinitionScope(servers.find(server => server.id === 'projectOne:reader')), {
+    kind: 'project',
+    id: 'projectOne',
+  });
 });
 
 test('Claude Code MCP scanner returns no servers for missing config file', async () => {
@@ -69,3 +74,7 @@ test('Claude Code MCP scanner returns no servers for missing config file', async
 
   assert.deepEqual(servers, []);
 });
+
+function firstDefinitionScope(server: MCPServer | undefined): McpAdapterScope | undefined {
+  return server?.definitions?.[0]?.scope;
+}

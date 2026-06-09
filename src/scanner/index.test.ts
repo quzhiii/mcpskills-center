@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BaseScanner } from './base.js';
 import { runInventory } from './index.js';
-import type { AgentConfig, MCPServer, Skill } from '../types/index.js';
+import type { AgentConfig, MCPServer, MCPServerDefinition, McpAdapterScope, Skill } from '../types/index.js';
 import type { ScannerRegistry } from './registry.js';
 
 class StubScanner extends BaseScanner {
@@ -30,10 +30,21 @@ function makeAgent(name: string): AgentConfig {
   };
 }
 
-function makeMcp(agentName: string, command: string): MCPServer {
+function makeMcp(agentName: string, command: string, scope: McpAdapterScope): MCPServer {
+  const definition: MCPServerDefinition = {
+    agentName,
+    transport: 'stdio',
+    command,
+    isEnabled: true,
+    canStart: null,
+    hasSensitiveEnv: false,
+    scope,
+  };
+
   return {
     id: 'filesystem',
     agentSources: [agentName],
+    definitions: [definition],
     transport: 'stdio',
     command,
     isDuplicate: false,
@@ -43,11 +54,25 @@ function makeMcp(agentName: string, command: string): MCPServer {
   };
 }
 
+test('MCPServerDefinition can retain adapter scope metadata', () => {
+  const definition: MCPServerDefinition = {
+    agentName: 'claude-code',
+    transport: 'stdio',
+    command: 'npx',
+    isEnabled: true,
+    canStart: null,
+    hasSensitiveEnv: false,
+    scope: { kind: 'project', id: 'project-one' },
+  };
+
+  assert.deepEqual(definition.scope, { kind: 'project', id: 'project-one' });
+});
+
 test('runInventory preserves per-agent MCP definition evidence when deduplicating servers', async () => {
   const agents = [makeAgent('claude-code'), makeAgent('opencode')];
   const mcpByAgent: Record<string, MCPServer[]> = {
-    'claude-code': [makeMcp('claude-code', 'npx')],
-    opencode: [makeMcp('opencode', 'node')],
+    'claude-code': [makeMcp('claude-code', 'npx', { kind: 'project', id: 'project-one' })],
+    opencode: [makeMcp('opencode', 'node', { kind: 'global' })],
   };
   const registry: ScannerRegistry = {
     createScanner(agent: AgentConfig): BaseScanner {
@@ -71,6 +96,7 @@ test('runInventory preserves per-agent MCP definition evidence when deduplicatin
       isEnabled: definition.isEnabled,
       canStart: definition.canStart,
       hasSensitiveEnv: definition.hasSensitiveEnv,
+      scope: definition.scope,
     })),
     [
       {
@@ -81,6 +107,7 @@ test('runInventory preserves per-agent MCP definition evidence when deduplicatin
         isEnabled: true,
         canStart: null,
         hasSensitiveEnv: false,
+        scope: { kind: 'project', id: 'project-one' },
       },
       {
         agentName: 'opencode',
@@ -90,6 +117,7 @@ test('runInventory preserves per-agent MCP definition evidence when deduplicatin
         isEnabled: true,
         canStart: null,
         hasSensitiveEnv: false,
+        scope: { kind: 'global' },
       },
     ]
   );

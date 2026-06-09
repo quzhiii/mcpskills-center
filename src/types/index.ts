@@ -79,6 +79,7 @@ export interface MCPServerDefinition {
   isEnabled: boolean;
   canStart: boolean | null;
   hasSensitiveEnv: boolean;
+  scope?: McpAdapterScope;
 }
 
 export type McpAdapterScopeKind = 'global' | 'project' | 'workspace' | 'unknown';
