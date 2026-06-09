@@ -116,6 +116,65 @@ test('writeInventoryJson and writeInventoryMarkdown include agent support metada
   assert.match(markdown, /Support: `generic read-only placeholder`/);
 });
 
+test('writeInventoryJson and writeInventoryMarkdown include MCP definition scope metadata', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mcpskills-inventory-scope-reporter-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+
+  const inventory: Inventory = {
+    generatedAt: '2026-06-06T00:00:00.000Z',
+    agents: [],
+    skills: [],
+    mcpServers: [
+      {
+        id: 'filesystem',
+        agentSources: ['claude-code', 'opencode'],
+        definitions: [
+          {
+            agentName: 'claude-code',
+            transport: 'stdio',
+            command: 'npx',
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+            scope: { kind: 'global' },
+          },
+          {
+            agentName: 'opencode',
+            transport: 'stdio',
+            command: 'npx',
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+            scope: { kind: 'project', id: 'project-one' },
+          },
+        ],
+        transport: 'stdio',
+        command: 'npx',
+        isDuplicate: true,
+        isEnabled: true,
+        canStart: null,
+        hasSensitiveEnv: false,
+      },
+    ],
+    profiles: [],
+  };
+
+  const jsonPath = join(root, 'inventory.json');
+  const markdownPath = join(root, 'inventory.md');
+
+  await writeInventoryJson(inventory, jsonPath);
+  await writeInventoryMarkdown(inventory, markdownPath);
+
+  const json = JSON.parse(await readFile(jsonPath, 'utf-8'));
+  const markdown = await readFile(markdownPath, 'utf-8');
+
+  assert.deepEqual(json.mcpServers[0].definitions[0].scope, { kind: 'global' });
+  assert.deepEqual(json.mcpServers[0].definitions[1].scope, { kind: 'project', id: 'project-one' });
+  assert.match(markdown, /\| Server \| Agent \| Transport \| Command \| Host \| Sensitive Env \| Scope \|/);
+  assert.match(markdown, /\| filesystem \| claude-code \| stdio \| `npx` \| - \| no \| global \|/);
+  assert.match(markdown, /\| filesystem \| opencode \| stdio \| `npx` \| - \| no \| project:project-one \|/);
+});
+
 test('writeAllReports carries support metadata into inventory outputs and dashboard without mutating inventory order', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mcpskills-all-reports-'));
   cleanups.push(() => rm(root, { recursive: true, force: true }));

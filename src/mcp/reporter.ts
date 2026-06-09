@@ -66,10 +66,10 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const manualReviewActions = plan.actions.filter(action => action.type === 'manual-review');
   if (manualReviewActions.length > 0) {
-    lines.push('| MCP | Agents | Reason |');
-    lines.push('|-----|--------|--------|');
+    lines.push('| MCP | Agents | Scope Policy | Reason |');
+    lines.push('|-----|--------|--------------|--------|');
     for (const action of manualReviewActions) {
-      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.reason)} |`);
+      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(action.reason)} |`);
     }
   } else {
     lines.push('No manual review actions.');
@@ -92,20 +92,20 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   lines.push('## Per-Agent Definitions');
   lines.push('');
-  lines.push('| MCP | Agent | Transport | Command | Host | Sensitive Env |');
-  lines.push('|-----|-------|-----------|---------|------|---------------|');
+  lines.push('| MCP | Agent | Transport | Command | Host | Sensitive Env | Scope |');
+  lines.push('|-----|-------|-----------|---------|------|---------------|-------|');
   for (const action of plan.actions) {
     for (const definition of action.definitions ?? []) {
-      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(definition.agentName)} | ${escapeMarkdownTableCell(definition.transport)} | ${formatValue(definition.command)} | ${formatValue(definition.host)} | ${definition.hasSensitiveEnv ? 'yes' : 'no'} |`);
+      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(definition.agentName)} | ${escapeMarkdownTableCell(definition.transport)} | ${formatValue(definition.command)} | ${formatValue(definition.host)} | ${definition.hasSensitiveEnv ? 'yes' : 'no'} | ${escapeMarkdownTableCell(formatScope(definition.scope))} |`);
     }
   }
   lines.push('');
   lines.push('## Actions');
   lines.push('');
-  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Requires Write | Reason |');
-  lines.push('|------|-----|--------|---------------------|-----------------|----------------|--------|');
+  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Scope Policy | Requires Write | Reason |');
+  lines.push('|------|-----|--------|---------------------|-----------------|--------------|----------------|--------|');
   for (const action of plan.actions) {
-    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
+    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
   }
   lines.push('');
 
@@ -132,6 +132,11 @@ function incrementSummary(target: Record<string, McpGovernancePlanSummaryCount>,
 
 function formatValue(value: string | undefined): string {
   return value ? `\`${escapeMarkdownTableCell(value)}\`` : '-';
+}
+
+function formatScope(scope: { kind: string; id?: string } | undefined): string {
+  if (!scope) return '-';
+  return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
 }
 
 function escapeMarkdownTableCell(value: string): string {

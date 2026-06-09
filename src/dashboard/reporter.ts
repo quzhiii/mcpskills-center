@@ -58,6 +58,20 @@ export async function writeInventoryMarkdown(inventory: Inventory, outPath: stri
   }
   lines.push('');
 
+  const definitions = [...enrichedInventory.mcpServers]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .flatMap(mcp => (mcp.definitions ?? []).map(definition => ({ mcpId: mcp.id, definition })));
+  if (definitions.length > 0) {
+    lines.push('### MCP Definition Evidence');
+    lines.push('');
+    lines.push('| Server | Agent | Transport | Command | Host | Sensitive Env | Scope |');
+    lines.push('|--------|-------|-----------|---------|------|---------------|-------|');
+    for (const { mcpId, definition } of definitions) {
+      lines.push(`| ${escapeMarkdownTableCell(mcpId)} | ${escapeMarkdownTableCell(definition.agentName)} | ${escapeMarkdownTableCell(definition.transport)} | ${formatValue(definition.command)} | ${formatValue(definition.host)} | ${definition.hasSensitiveEnv ? 'yes' : 'no'} | ${escapeMarkdownTableCell(formatScope(definition.scope))} |`);
+    }
+    lines.push('');
+  }
+
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, lines.join('\n'), 'utf-8');
 }
@@ -144,6 +158,15 @@ export async function writeAuditMarkdown(report: AuditReport, outPath: string): 
 
 function escapeMarkdownTableCell(value: string): string {
   return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+function formatValue(value: string | undefined): string {
+  return value ? `\`${escapeMarkdownTableCell(value)}\`` : '-';
+}
+
+function formatScope(scope: { kind: string; id?: string } | undefined): string {
+  if (!scope) return '-';
+  return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
 }
 
 export async function writeAllReports(inventory: Inventory, audit: AuditReport, baseDir: string): Promise<void> {
