@@ -150,11 +150,20 @@ The roadmap below treats those as explicit phases rather than implicit “later�
 
 **Outcome:** A user can inventory MCP duplication and drift, then generate explicit MCP governance plans without blindly editing multiple agents.
 
-**What to build:**
+**Current baseline already completed on `master`:**
+
+- dry-run MCP governance planning
+- MCP governance Markdown/JSON reports
+- canonical profile candidate metadata and env-risk policy summaries
+- read-only MCP config adapters for `claude-code`, `opencode`, and `codex`
+
+**What to build next inside this phase:**
 
 - canonical MCP profile model
-- per-agent MCP config adapters
-- MCP plan/apply/restore flow
+- scope-aware MCP governance decisions
+- inventory/report parity for per-definition scope evidence
+- MCP write-model design only after scope/source-of-truth semantics are proven
+- MCP plan/apply/restore flow later
 - env-risk handling rules
 - active-vs-passive write support boundaries per agent
 
@@ -219,27 +228,38 @@ The roadmap below treats those as explicit phases rather than implicit “later�
 
 ## First Implementation Slice Recommendation
 
-The next implementation milestone should be a narrow, high-value slice from Phase 1.
+The next implementation milestone should be a narrow, high-value slice from Phase 3.
 
-**Recommended slice:** “Skills Governance Kernel v2”
+**Recommended slice:** `mcp-scope-governance-v1`
 
 That slice should include:
 
-- more expressive sync plan action types
-- deterministic canonical promotion rules
-- clearer skip/manual-review reasons
-- improved sync Markdown/HTML/JSON reporting
-- tests that prove dry-run and apply align
+- preserve adapter scope metadata through scanner inventory
+- scope-aware MCP duplicate classification in the planner
+- clearer scope-conflict explanations in MCP Markdown/JSON/inventory outputs
+- tests that prove adapter extraction still preserves inventory evidence end-to-end
 
 This is better than starting with Web because:
 
-- it improves the core engine instead of decorating a rough one
-- it produces cleaner inputs for the future control plane
-- it directly reduces the pain of duplicated local skills installs
+- it strengthens the MCP kernel before any write model exists
+- it prevents future MCP canonicalization from being built on lossy scope semantics
+- it improves the evidence quality that future Web/UI layers would need anyway
+
+This is better than jumping straight to MCP apply/restore because:
+
+- scope is already parsed by adapters but currently underused by governance
+- write semantics built before scope semantics would lock in the wrong abstraction
+- manual review quality is a cheaper and safer product gain than early MCP writes
 
 ---
 
-## Execution Plan
+## Historical Execution Plan
+
+The detailed task list below reflects the earlier `skills governance v2` recommendation that existed before the MCP governance slices on `master` were completed.
+
+It is now superseded as the immediate next milestone by `docs/plans/2026-06-09-mcp-scope-governance-v1.md`.
+
+## Historical Execution Plan
 
 ### Task 1: Formalize Skills Governance v2 data model
 
@@ -482,11 +502,11 @@ This roadmap is working if, after the next implementation slice:
 
 ## Recommended Next Step
 
-Do **not** start with Web or SQLite.
+Do **not** start with Web, SQLite, or MCP write workflows.
 
-Start with **Phase 1 / Task 1** from this plan: refine the skills sync action model and make the kernel more governance-aware.
+Start with `docs/plans/2026-06-09-mcp-scope-governance-v1.md`.
 
-That is the shortest path to turning MCPskills Center from a strong scanner into a true local governance system.
+That is the shortest path to making the current MCP governance kernel more trustworthy before any write-capable MCP lane is designed.
 
 ---
 

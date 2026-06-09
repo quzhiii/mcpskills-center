@@ -54,9 +54,9 @@ Agent support status is summarized in `docs/supported-agents.md`.
 
 ## Governance Roadmap
 
-Current priority is skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
+Current write-capable priority remains skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
 
-MCP governance is next. MCP sources stay report-first until their source-of-truth model, write boundaries, backup behavior, and restore semantics are proven.
+MCP governance is now active on the read-only/report-first lane. The current next MCP milestone is scope-aware governance: preserve per-definition scope evidence through inventory and use it to improve MCP dry-run planning before any MCP write workflow is introduced.
 
 Longer-term layers are a local Web control plane over the CLI kernel, then intelligent local agent routing after governed capability state is stable. Web, SQLite history, and routing are intentionally not the first implementation priority.
 

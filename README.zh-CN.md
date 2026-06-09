@@ -54,9 +54,9 @@ Codex 配置 ───────┘                      │
 
 ## 治理路线图
 
-当前优先级是 skills governance：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
+当前仍然以 skills governance 作为写入能力的优先主线：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
 
-MCP governance 是下一条治理线。在 source-of-truth、写入边界、备份行为和 restore 语义被证明前，MCP 配置继续保持 report-first。
+MCP governance 现在已经进入只读 / report-first 主线。当前 MCP 的下一里程碑是 scope-aware governance：把 per-definition scope 证据从 inventory 保留下来，并在真正引入 MCP 写入工作流之前，用它提升 dry-run 规划质量。
 
 更长期的层次是基于 CLI kernel 的本地 Web control plane，然后才是智能本地 agent routing。Web、SQLite 历史、routing 都不是当前第一优先级。
 
