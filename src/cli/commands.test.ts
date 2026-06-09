@@ -212,6 +212,99 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
   assert.deepEqual(writes, ['mcp-governance-plan']);
 });
 
+test('executeCommand summarizes scope-aware mcp plan decisions', async () => {
+  const writes: string[] = [];
+  const output = await executeCommand(makeCli('mcp', { subcommand: 'plan' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      ...makeInventory(),
+      mcpServers: [
+        {
+          id: 'filesystem',
+          agentSources: ['claude-code', 'opencode'],
+          definitions: [
+            {
+              agentName: 'claude-code',
+              transport: 'stdio',
+              command: 'npx',
+              isEnabled: true,
+              canStart: null,
+              hasSensitiveEnv: false,
+              scope: { kind: 'global' },
+            },
+            {
+              agentName: 'opencode',
+              transport: 'stdio',
+              command: 'npx',
+              isEnabled: true,
+              canStart: null,
+              hasSensitiveEnv: false,
+              scope: { kind: 'global' },
+            },
+          ],
+          transport: 'stdio',
+          command: 'npx',
+          isDuplicate: true,
+          isEnabled: true,
+          canStart: null,
+          hasSensitiveEnv: false,
+        },
+        {
+          id: 'memory',
+          agentSources: ['claude-code', 'codex'],
+          definitions: [
+            {
+              agentName: 'claude-code',
+              transport: 'stdio',
+              command: 'npx',
+              isEnabled: true,
+              canStart: null,
+              hasSensitiveEnv: false,
+              scope: { kind: 'global' },
+            },
+            {
+              agentName: 'codex',
+              transport: 'stdio',
+              command: 'npx',
+              isEnabled: true,
+              canStart: null,
+              hasSensitiveEnv: false,
+              scope: { kind: 'project', id: 'project-one' },
+            },
+          ],
+          transport: 'stdio',
+          command: 'npx',
+          isDuplicate: true,
+          isEnabled: true,
+          canStart: null,
+          hasSensitiveEnv: false,
+        },
+      ],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    writeMcpGovernancePlanReports: async () => { writes.push('mcp-governance-plan'); },
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Canonical Candidates: 1/);
+  assert.match(output, /Manual Review: 1/);
+  assert.match(output, /Scope Policies: no-scope-conflict-detected=1, scope-conflict-requires-review=1/);
+  assert.deepEqual(writes, ['mcp-governance-plan']);
+});
+
 test('executeCommand handles matrix and writes reports', async () => {
   const writes: string[] = [];
   const output = await executeCommand(makeCli('matrix'), {
