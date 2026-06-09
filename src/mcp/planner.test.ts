@@ -62,6 +62,7 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
   assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
   assert.equal(plan.actions[0].envRiskPolicy, 'no-env-risk-detected');
   assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
+    status: 'eligible',
     profileId: 'filesystem',
     mcpId: 'filesystem',
     sourceAgentName: 'claude-code',
@@ -73,8 +74,14 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
       isEnabled: true,
       canStart: null,
       hasSensitiveEnv: false,
+      scope: undefined,
     },
+    scope: undefined,
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
     blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
   });
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /equivalent duplicate/i);
@@ -100,6 +107,28 @@ test('planMcpGovernance keeps equivalent duplicate definitions with identical gl
   assert.equal(plan.actions[0].mcpId, 'filesystem');
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.equal(getScopePolicy(plan.actions[0]), 'no-scope-conflict-detected');
+  assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
+    status: 'eligible',
+    profileId: 'filesystem',
+    mcpId: 'filesystem',
+    sourceAgentName: 'claude-code',
+    agentNames: ['claude-code', 'opencode'],
+    definition: {
+      transport: 'stdio',
+      command: 'npx',
+      host: undefined,
+      isEnabled: true,
+      canStart: null,
+      hasSensitiveEnv: false,
+      scope: { kind: 'global' },
+    },
+    scope: { kind: 'global' },
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
+    blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
+  });
 });
 
 test('planMcpGovernance sends equivalent duplicate definitions with different scopes to manual review', () => {

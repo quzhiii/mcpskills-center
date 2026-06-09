@@ -194,6 +194,7 @@ function createCanonicalProfileCandidate(
 ): NonNullable<McpGovernanceAction['canonicalProfileCandidate']> {
   const sourceDefinition = definitions[0];
   return {
+    status: 'eligible',
     profileId: mcp.id,
     mcpId: mcp.id,
     sourceAgentName: sourceDefinition.agentName,
@@ -205,7 +206,13 @@ function createCanonicalProfileCandidate(
       isEnabled: sourceDefinition.isEnabled,
       canStart: sourceDefinition.canStart,
       hasSensitiveEnv: sourceDefinition.hasSensitiveEnv,
+      scope: sourceDefinition.scope,
     },
+    scope: sourceDefinition.scope,
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
     blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
   };
 }

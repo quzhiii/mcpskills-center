@@ -122,13 +122,21 @@ export type McpEnvRiskPolicy = 'no-env-risk-detected' | 'sensitive-env-blocks-ca
 
 export type McpScopePolicy = 'no-scope-conflict-detected' | 'scope-conflict-requires-review';
 
+export type McpCanonicalProfileStatus = 'eligible';
+
 export interface McpCanonicalProfileCandidate {
+  status?: McpCanonicalProfileStatus;
   profileId: string;
   mcpId: string;
   sourceAgentName: string;
   agentNames: string[];
   definition: Omit<MCPServerDefinition, 'agentName'>;
+  scope?: McpAdapterScope;
+  envRiskPolicy?: McpEnvRiskPolicy;
+  scopePolicy?: McpScopePolicy;
+  blockers?: [];
   blockedByEnvRisk: boolean;
+  eligibilityReason?: string;
 }
 
 export interface Profile {
