@@ -351,6 +351,11 @@ test('writeInventoryJson prefers current scannerType over stale embedded support
         support: {
           currentLevel: 'generic read-only placeholder',
           sourceOfTruthConfidence: 'low',
+          mcpReadSupport: 'native',
+          mcpPlanSupport: 'observe-only',
+          mcpApplySupport: 'observe-only',
+          mcpRestoreSupport: 'unproven',
+          mcpConfigOwnershipConfidence: 'low',
         },
       },
     ],
