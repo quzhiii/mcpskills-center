@@ -15,6 +15,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         definitions,
         agentNames,
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server is configured in only one agent; no governance action is needed',
       }));
       continue;
@@ -28,6 +29,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         definitions,
         agentNames,
         envRiskPolicy: 'unknown-transport-requires-review',
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has unknown transport and must be reviewed before canonicalization',
       }));
       continue;
@@ -41,7 +43,22 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         definitions,
         agentNames,
         envRiskPolicy: 'sensitive-env-blocks-canonicalization',
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
+      }));
+      continue;
+    }
+
+    if (hasScopeConflict(definitions)) {
+      actions.push(createAction({
+        index: actions.length,
+        type: 'manual-review',
+        mcp,
+        definitions,
+        agentNames,
+        envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: 'scope-conflict-requires-review',
+        reason: `MCP duplicate definitions have a scope conflict (${describeScopes(definitions)}) and require manual review`,
       }));
       continue;
     }
@@ -54,6 +71,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         definitions,
         agentNames,
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP duplicate definitions drift across agents and require manual review',
       }));
       continue;
@@ -68,6 +86,7 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
       canonicalAgentName: agentNames[0],
       canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, definitions, agentNames),
       envRiskPolicy: 'no-env-risk-detected',
+      scopePolicy: 'no-scope-conflict-detected',
       reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
     }));
   }
@@ -87,6 +106,7 @@ function createAction(args: {
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpGovernanceAction['canonicalProfileCandidate'];
   envRiskPolicy: McpGovernanceAction['envRiskPolicy'];
+  scopePolicy: McpGovernanceAction['scopePolicy'];
   reason: string;
 }): McpGovernanceAction {
   return {
@@ -97,6 +117,7 @@ function createAction(args: {
     canonicalAgentName: args.canonicalAgentName,
     canonicalProfileCandidate: args.canonicalProfileCandidate,
     envRiskPolicy: args.envRiskPolicy,
+    scopePolicy: args.scopePolicy,
     definitions: args.definitions,
     reason: args.reason,
     requiresWrite: false,
@@ -146,6 +167,24 @@ function classifyEnvRiskPolicy(definitions: MCPServerDefinition[]): McpGovernanc
   if (hasUnknownTransport(definitions)) return 'unknown-transport-requires-review';
   if (hasSensitiveEnvDriftRisk(definitions)) return 'sensitive-env-blocks-canonicalization';
   return 'no-env-risk-detected';
+}
+
+function classifyScopePolicy(definitions: MCPServerDefinition[]): McpGovernanceAction['scopePolicy'] {
+  return hasScopeConflict(definitions) ? 'scope-conflict-requires-review' : 'no-scope-conflict-detected';
+}
+
+function hasScopeConflict(definitions: MCPServerDefinition[]): boolean {
+  return new Set(definitions.map(definition => normalizeScope(definition))).size > 1;
+}
+
+function normalizeScope(definition: MCPServerDefinition): string {
+  const scope = definition.scope;
+  if (!scope) return 'unknown';
+  return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
+}
+
+function describeScopes(definitions: MCPServerDefinition[]): string {
+  return [...new Set(definitions.map(definition => normalizeScope(definition)))].join(', ');
 }
 
 function createCanonicalProfileCandidate(

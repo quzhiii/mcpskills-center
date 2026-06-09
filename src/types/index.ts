@@ -112,12 +112,15 @@ export interface McpGovernanceAction {
   canonicalAgentName?: string;
   canonicalProfileCandidate?: McpCanonicalProfileCandidate;
   envRiskPolicy: McpEnvRiskPolicy;
+  scopePolicy?: McpScopePolicy;
   definitions?: MCPServerDefinition[];
   reason: string;
   requiresWrite: false;
 }
 
 export type McpEnvRiskPolicy = 'no-env-risk-detected' | 'sensitive-env-blocks-canonicalization' | 'unknown-transport-requires-review';
+
+export type McpScopePolicy = 'no-scope-conflict-detected' | 'scope-conflict-requires-review';
 
 export interface McpCanonicalProfileCandidate {
   profileId: string;

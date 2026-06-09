@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planMcpGovernance } from './planner.js';
-import type { Inventory, MCPServer, MCPServerDefinition } from '../types/index.js';
+import type { Inventory, MCPServer, MCPServerDefinition, McpScopePolicy } from '../types/index.js';
 
 function makeDefinition(overrides: Partial<MCPServerDefinition>): MCPServerDefinition {
   return {
@@ -78,6 +78,141 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
   });
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /equivalent duplicate/i);
+});
+
+test('planMcpGovernance keeps equivalent duplicate definitions with identical global scope as canonical candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'global' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(plan.actions[0].mcpId, 'filesystem');
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.equal(getScopePolicy(plan.actions[0]), 'no-scope-conflict-detected');
+});
+
+test('planMcpGovernance sends equivalent duplicate definitions with different scopes to manual review', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].mcpId, 'filesystem');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.match(plan.actions[0].reason, /scope conflict/i);
+});
+
+test('planMcpGovernance calls out global and project duplicate scope conflicts explicitly', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[0].reason, /global/i);
+  assert.match(plan.actions[0].reason, /project:project-one/i);
+});
+
+test('planMcpGovernance keeps same-project scoped duplicates canonical when otherwise equivalent', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(getScopePolicy(plan.actions[0]), 'no-scope-conflict-detected');
+});
+
+test('planMcpGovernance keeps env and transport review precedence over scope mismatch', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'secrets',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', hasSensitiveEnv: true, scope: { kind: 'global' } }),
+        makeDefinition({
+          agentName: 'opencode',
+          command: 'npx',
+          hasSensitiveEnv: true,
+          scope: { kind: 'project', id: 'project-one' },
+        }),
+      ],
+      isDuplicate: true,
+      hasSensitiveEnv: true,
+    }),
+    makeMcp({
+      id: 'unknown-server',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', transport: 'unknown', command: undefined, scope: { kind: 'global' } }),
+        makeDefinition({
+          agentName: 'opencode',
+          transport: 'unknown',
+          command: undefined,
+          scope: { kind: 'project', id: 'project-one' },
+        }),
+      ],
+      transport: 'unknown',
+      command: undefined,
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].envRiskPolicy, 'sensitive-env-blocks-canonicalization');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[0].reason, /sensitive env risk/i);
+  assert.doesNotMatch(plan.actions[0].reason, /scope conflict/i);
+  assert.equal(plan.actions[1].type, 'manual-review');
+  assert.equal(plan.actions[1].envRiskPolicy, 'unknown-transport-requires-review');
+  assert.equal(getScopePolicy(plan.actions[1]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[1].reason, /unknown transport/i);
+  assert.doesNotMatch(plan.actions[1].reason, /scope conflict/i);
 });
 
 test('planMcpGovernance skips single-agent definitions with an explicit reason', () => {
@@ -172,3 +307,7 @@ test('planMcpGovernance sends unknown transport definitions to manual review wit
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /unknown transport/i);
 });
+
+function getScopePolicy(action: { scopePolicy?: McpScopePolicy }): McpScopePolicy | undefined {
+  return action.scopePolicy;
+}
