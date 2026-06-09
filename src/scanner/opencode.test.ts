@@ -63,6 +63,54 @@ test('OpenCode MCP scanner detects sensitive env keys', async () => {
   assert.equal(servers[0].hasSensitiveEnv, true);
 });
 
+test('OpenCode MCP scanner honors explicitly disabled MCP entries', async () => {
+  const fixture = await createTempAgentRoot('mcpskills-opencode-disabled-');
+  cleanups.push(fixture.cleanup);
+
+  const mcpConfigFile = join(fixture.root, 'opencode.json');
+  await writeFile(
+    mcpConfigFile,
+    JSON.stringify({ mcp: { memory: { command: 'npx', enabled: false } } }),
+    'utf-8'
+  );
+
+  const config: AgentConfig = {
+    name: 'opencode',
+    configDir: fixture.root,
+    skillsDir: fixture.skillsDir,
+    mcpConfigFile,
+  };
+
+  const servers = await new OpenCodeScanner(config).scanMCP();
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].isEnabled, false);
+});
+
+test('OpenCode MCP scanner detects sensitive environment keys', async () => {
+  const fixture = await createTempAgentRoot('mcpskills-opencode-environment-');
+  cleanups.push(fixture.cleanup);
+
+  const mcpConfigFile = join(fixture.root, 'opencode.json');
+  await writeFile(
+    mcpConfigFile,
+    JSON.stringify({ mcp: { memory: { command: 'npx', environment: { API_TOKEN: 'redacted' } } } }),
+    'utf-8'
+  );
+
+  const config: AgentConfig = {
+    name: 'opencode',
+    configDir: fixture.root,
+    skillsDir: fixture.skillsDir,
+    mcpConfigFile,
+  };
+
+  const servers = await new OpenCodeScanner(config).scanMCP();
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].hasSensitiveEnv, true);
+});
+
 test('OpenCode MCP scanner reads array-form local commands', async () => {
   const fixture = await createTempAgentRoot('mcpskills-opencode-array-command-');
   cleanups.push(fixture.cleanup);

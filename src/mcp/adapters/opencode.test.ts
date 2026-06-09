@@ -38,3 +38,21 @@ test('OpenCode adapter detects sensitive env keys', () => {
   assert.equal(servers.length, 1);
   assert.equal(servers[0].hasSensitiveEnv, true);
 });
+
+test('OpenCode adapter honors explicitly disabled MCP entries', () => {
+  const servers = parseOpenCodeMcpConfig(
+    JSON.stringify({ mcp: { memory: { command: 'npx', enabled: false } } })
+  );
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].isEnabled, false);
+});
+
+test('OpenCode adapter detects sensitive environment keys', () => {
+  const servers = parseOpenCodeMcpConfig(
+    JSON.stringify({ mcp: { memory: { command: 'npx', environment: { API_TOKEN: 'redacted' } } } })
+  );
+
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].hasSensitiveEnv, true);
+});

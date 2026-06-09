@@ -12,7 +12,7 @@ export const parseOpenCodeMcpConfig: McpConfigAdapter['parse'] = (content: strin
       transport: detectTransport(cfg),
       command: extractCommand(cfg),
       host: typeof cfg.url === 'string' ? cfg.url : undefined,
-      isEnabled: true,
+      isEnabled: cfg.enabled !== false,
       hasSensitiveEnv: checkSensitiveEnv(cfg),
       scope: { kind: 'global' },
     } satisfies ParsedMcpConfigServer;
@@ -46,7 +46,10 @@ function extractCommand(cfg: Record<string, unknown>): string | undefined {
 }
 
 function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
-  const env = asRecord(cfg.env);
+  const env = {
+    ...asRecord(cfg.env),
+    ...asRecord(cfg.environment),
+  };
   const sensitiveKeys = ['api_key', 'apikey', 'token', 'secret', 'password', 'auth'];
   return Object.keys(env).some(key => sensitiveKeys.some(s => key.toLowerCase().includes(s)));
 }
