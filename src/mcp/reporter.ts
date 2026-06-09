@@ -66,10 +66,10 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const manualReviewActions = plan.actions.filter(action => action.type === 'manual-review');
   if (manualReviewActions.length > 0) {
-    lines.push('| MCP | Agents | Scope Policy | Reason |');
-    lines.push('|-----|--------|--------------|--------|');
+    lines.push('| MCP | Agents | Scope Policy | Canonical Profile Blockers | Reason |');
+    lines.push('|-----|--------|--------------|----------------------------|--------|');
     for (const action of manualReviewActions) {
-      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(action.reason)} |`);
+      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(formatBlockers(action.canonicalProfileBlockers))} | ${escapeMarkdownTableCell(action.reason)} |`);
     }
   } else {
     lines.push('No manual review actions.');
@@ -79,12 +79,12 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const canonicalCandidateActions = plan.actions.filter(action => action.canonicalProfileCandidate);
   if (canonicalCandidateActions.length > 0) {
-    lines.push('| Profile | MCP | Source Agent | Target Agents | Blocked By Env Risk |');
-    lines.push('|---------|-----|--------------|---------------|---------------------|');
+    lines.push('| Profile | MCP | Source Agent | Target Agents | Status | Scope | Env Policy | Scope Policy | Eligibility Reason |');
+    lines.push('|---------|-----|--------------|---------------|--------|-------|------------|--------------|--------------------|');
     for (const action of canonicalCandidateActions) {
       const candidate = action.canonicalProfileCandidate;
       if (!candidate) continue;
-      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${candidate.blockedByEnvRisk ? 'yes' : 'no'} |`);
+      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${escapeMarkdownTableCell(candidate.status ?? '-')} | ${escapeMarkdownTableCell(formatScope(candidate.scope))} | ${escapeMarkdownTableCell(candidate.envRiskPolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.eligibilityReason ?? '-')} |`);
     }
   } else {
     lines.push('No canonical profile candidates.');
@@ -102,10 +102,10 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   lines.push('## Actions');
   lines.push('');
-  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Scope Policy | Requires Write | Reason |');
-  lines.push('|------|-----|--------|---------------------|-----------------|--------------|----------------|--------|');
+  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Scope Policy | Canonical Profile Blockers | Requires Write | Reason |');
+  lines.push('|------|-----|--------|---------------------|-----------------|--------------|----------------------------|----------------|--------|');
   for (const action of plan.actions) {
-    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
+    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(formatBlockers(action.canonicalProfileBlockers))} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
   }
   lines.push('');
 
@@ -137,6 +137,10 @@ function formatValue(value: string | undefined): string {
 function formatScope(scope: { kind: string; id?: string } | undefined): string {
   if (!scope) return '-';
   return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
+}
+
+function formatBlockers(blockers: string[] | undefined): string {
+  return blockers && blockers.length > 0 ? blockers.join(', ') : 'none';
 }
 
 function escapeMarkdownTableCell(value: string): string {

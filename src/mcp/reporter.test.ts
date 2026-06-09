@@ -120,15 +120,15 @@ test('renderMcpGovernancePlanMarkdown renders summary, manual review, and defini
   assert.match(markdown, /\| manual-review \| 1 \| 0 \|/);
   assert.match(markdown, /\| skip \| 1 \| 0 \|/);
   assert.match(markdown, /## Manual Review Required/);
-  assert.match(markdown, /\| memory \| claude-code, codex \| - \| MCP duplicate definitions drift across agents and require manual review \|/);
+  assert.match(markdown, /\| memory \| claude-code, codex \| - \| none \| MCP duplicate definitions drift across agents and require manual review \|/);
   assert.match(markdown, /## Canonical Profile Candidates/);
-  assert.match(markdown, /\| filesystem \| filesystem \| claude-code \| claude-code, opencode \| no \|/);
+  assert.match(markdown, /\| filesystem \| filesystem \| claude-code \| claude-code, opencode \| - \| - \| - \| - \| - \|/);
   assert.match(markdown, /## Per-Agent Definitions/);
   assert.match(markdown, /\| filesystem \| claude-code \| stdio \| `npx` \| - \| no \| - \|/);
   assert.match(markdown, /\| memory \| codex \| stdio \| `node` \| - \| no \| - \|/);
   assert.match(markdown, /\| single \| opencode \| http \| - \| `https:\/\/example\.test\/mcp` \| no \| - \|/);
-  assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Env Risk Policy \| Scope Policy \| Requires Write \| Reason \|/);
-  assert.match(markdown, /\| canonical-candidate \| filesystem \| claude-code, opencode \| claude-code \| no-env-risk-detected \| - \| no \| MCP server has equivalent duplicate definitions and is a canonical profile candidate \|/);
+  assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Env Risk Policy \| Scope Policy \| Canonical Profile Blockers \| Requires Write \| Reason \|/);
+  assert.match(markdown, /\| canonical-candidate \| filesystem \| claude-code, opencode \| claude-code \| no-env-risk-detected \| - \| none \| no \| MCP server has equivalent duplicate definitions and is a canonical profile candidate \|/);
 });
 
 test('renderMcpGovernancePlanMarkdown includes scope evidence and scope review policy', () => {
@@ -170,11 +170,74 @@ test('renderMcpGovernancePlanMarkdown includes scope evidence and scope review p
 
   const markdown = renderMcpGovernancePlanMarkdown(plan);
 
-  assert.match(markdown, /\| MCP \| Agents \| Scope Policy \| Reason \|/);
-  assert.match(markdown, /\| filesystem \| claude-code, opencode \| scope-conflict-requires-review \| MCP duplicate definitions have a scope conflict \(global, project:project-one\) and require manual review \|/);
+  assert.match(markdown, /\| MCP \| Agents \| Scope Policy \| Canonical Profile Blockers \| Reason \|/);
+  assert.match(markdown, /\| filesystem \| claude-code, opencode \| scope-conflict-requires-review \| none \| MCP duplicate definitions have a scope conflict \(global, project:project-one\) and require manual review \|/);
   assert.match(markdown, /\| MCP \| Agent \| Transport \| Command \| Host \| Sensitive Env \| Scope \|/);
   assert.match(markdown, /\| filesystem \| claude-code \| stdio \| `npx` \| - \| no \| global \|/);
   assert.match(markdown, /\| filesystem \| opencode \| stdio \| `npx` \| - \| no \| project:project-one \|/);
+});
+
+test('renderMcpGovernancePlanMarkdown includes canonical profile eligibility and blockers', () => {
+  const plan: McpGovernancePlan = {
+    generatedAt: '2026-06-08T00:00:00.000Z',
+    actions: [
+      {
+        id: 'canonical-candidate:filesystem:0',
+        type: 'canonical-candidate',
+        mcpId: 'filesystem',
+        agentNames: ['claude-code', 'opencode'],
+        canonicalAgentName: 'claude-code',
+        canonicalProfileBlockers: [],
+        canonicalProfileCandidate: {
+          status: 'eligible',
+          profileId: 'filesystem',
+          mcpId: 'filesystem',
+          sourceAgentName: 'claude-code',
+          agentNames: ['claude-code', 'opencode'],
+          definition: {
+            transport: 'stdio',
+            command: 'npx',
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+            scope: { kind: 'global' },
+          },
+          scope: { kind: 'global' },
+          envRiskPolicy: 'no-env-risk-detected',
+          scopePolicy: 'no-scope-conflict-detected',
+          blockers: [],
+          blockedByEnvRisk: false,
+          eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
+        },
+        envRiskPolicy: 'no-env-risk-detected',
+        scopePolicy: 'no-scope-conflict-detected',
+        definitions: [],
+        reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
+        requiresWrite: false,
+      },
+      {
+        id: 'manual-review:memory:1',
+        type: 'manual-review',
+        mcpId: 'memory',
+        agentNames: ['claude-code', 'codex'],
+        canonicalProfileBlockers: ['scope-conflict'],
+        envRiskPolicy: 'no-env-risk-detected',
+        scopePolicy: 'scope-conflict-requires-review',
+        definitions: [],
+        reason: 'MCP duplicate definitions have a scope conflict (global, project:project-one) and require manual review',
+        requiresWrite: false,
+      },
+    ],
+  };
+
+  const markdown = renderMcpGovernancePlanMarkdown(plan);
+
+  assert.match(markdown, /\| Profile \| MCP \| Source Agent \| Target Agents \| Status \| Scope \| Env Policy \| Scope Policy \| Eligibility Reason \|/);
+  assert.match(markdown, /\| filesystem \| filesystem \| claude-code \| claude-code, opencode \| eligible \| global \| no-env-risk-detected \| no-scope-conflict-detected \| MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate \|/);
+  assert.match(markdown, /\| MCP \| Agents \| Scope Policy \| Canonical Profile Blockers \| Reason \|/);
+  assert.match(markdown, /\| memory \| claude-code, codex \| scope-conflict-requires-review \| scope-conflict \| MCP duplicate definitions have a scope conflict \(global, project:project-one\) and require manual review \|/);
+  assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Env Risk Policy \| Scope Policy \| Canonical Profile Blockers \| Requires Write \| Reason \|/);
+  assert.match(markdown, /\| canonical-candidate \| filesystem \| claude-code, opencode \| claude-code \| no-env-risk-detected \| no-scope-conflict-detected \| none \| no \| MCP server has equivalent duplicate definitions and is a canonical profile candidate \|/);
 });
 
 test('writeMcpGovernancePlanReports preserves scope evidence when serializing reports', async () => {
@@ -224,6 +287,61 @@ test('writeMcpGovernancePlanReports preserves scope evidence when serializing re
   assert.deepEqual(json.actions[0].definitions[0].scope, { kind: 'global' });
   assert.deepEqual(json.actions[0].definitions[1].scope, { kind: 'project', id: 'project-one' });
   assert.match(markdown, /project:project-one/);
+});
+
+test('writeMcpGovernancePlanReports preserves canonical profile evidence when serializing reports', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mcpskills-mcp-canonical-profile-report-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+
+  const plan: McpGovernancePlan = {
+    generatedAt: '2026-06-08T00:00:00.000Z',
+    actions: [
+      {
+        id: 'canonical-candidate:filesystem:0',
+        type: 'canonical-candidate',
+        mcpId: 'filesystem',
+        agentNames: ['claude-code', 'opencode'],
+        canonicalAgentName: 'claude-code',
+        canonicalProfileBlockers: [],
+        canonicalProfileCandidate: {
+          status: 'eligible',
+          profileId: 'filesystem',
+          mcpId: 'filesystem',
+          sourceAgentName: 'claude-code',
+          agentNames: ['claude-code', 'opencode'],
+          definition: {
+            transport: 'stdio',
+            command: 'npx',
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+            scope: { kind: 'global' },
+          },
+          scope: { kind: 'global' },
+          envRiskPolicy: 'no-env-risk-detected',
+          scopePolicy: 'no-scope-conflict-detected',
+          blockers: [],
+          blockedByEnvRisk: false,
+          eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
+        },
+        envRiskPolicy: 'no-env-risk-detected',
+        scopePolicy: 'no-scope-conflict-detected',
+        definitions: [],
+        reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
+        requiresWrite: false,
+      },
+    ],
+  };
+
+  await writeMcpGovernancePlanReports(plan, root);
+  const json = JSON.parse(await readFile(join(root, 'mcp-governance-plan-current.json'), 'utf-8'));
+  const markdown = await readFile(join(root, 'mcp-governance-plan-current.md'), 'utf-8');
+
+  assert.equal(json.actions[0].canonicalProfileCandidate.status, 'eligible');
+  assert.deepEqual(json.actions[0].canonicalProfileCandidate.scope, { kind: 'global' });
+  assert.deepEqual(json.actions[0].canonicalProfileCandidate.blockers, []);
+  assert.deepEqual(json.actions[0].canonicalProfileBlockers, []);
+  assert.match(markdown, /eligible/);
 });
 
 test('writeMcpGovernancePlanReports writes JSON with dry-run summary counts', async () => {
