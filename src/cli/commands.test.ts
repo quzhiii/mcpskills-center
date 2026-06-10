@@ -207,6 +207,7 @@ test('executeCommand handles mcp plan dry-run and writes reports', async () => {
   assert.match(output, /Manual Review: 1/);
   assert.match(output, /Write Actions: 0/);
   assert.match(output, /Env Risk Policies: no-env-risk-detected=1, unknown-transport-requires-review=1/);
+  assert.match(output, /Canonical Target Policies: alphabetical-write-ready-tiebreak=1/);
   assert.match(output, /Action Types: canonical-candidate=1, manual-review=1/);
   assert.match(output, /Reports written to: C:\/reports/);
   assert.deepEqual(writes, ['mcp-governance-plan']);

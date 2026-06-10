@@ -109,6 +109,7 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
     `   Canonical Profile Blockers: ${formatActionTypeCounts(summary.canonicalProfileBlockers)}`,
     `   Write Actions: ${summary.writeActions}`,
     `   Env Risk Policies: ${formatActionTypeCounts(summary.envRiskPolicies)}`,
+    `   Canonical Target Policies: ${formatActionTypeCounts(summary.canonicalTargetPolicies)}`,
     `   Scope Policies: ${formatActionTypeCounts(countMcpScopePolicies(plan.actions))}`,
     `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
     '',

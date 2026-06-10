@@ -78,6 +78,8 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
       scope: undefined,
     },
     scope: undefined,
+    canonicalTargetPolicy: 'alphabetical-write-ready-tiebreak',
+    canonicalTargetReason: 'Canonical target selected by alphabetical tie-break among equally write-ready agents (claude-code)',
     envRiskPolicy: 'no-env-risk-detected',
     scopePolicy: 'no-scope-conflict-detected',
     blockers: [],
@@ -125,12 +127,72 @@ test('planMcpGovernance keeps equivalent duplicate definitions with identical gl
       scope: { kind: 'global' },
     },
     scope: { kind: 'global' },
+    canonicalTargetPolicy: 'alphabetical-write-ready-tiebreak',
+    canonicalTargetReason: 'Canonical target selected by alphabetical tie-break among equally write-ready agents (claude-code)',
     envRiskPolicy: 'no-env-risk-detected',
     scopePolicy: 'no-scope-conflict-detected',
     blockers: [],
     blockedByEnvRisk: false,
     eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
   });
+});
+
+test('planMcpGovernance selects canonical target deterministically instead of using input order', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['opencode', 'claude-code'],
+      definitions: [
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+        makeDefinition({ agentName: 'claude-code', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
+  assert.equal(plan.actions[0].canonicalProfileCandidate?.sourceAgentName, 'claude-code');
+});
+
+test('planMcpGovernance prefers write-ready canonical targets over observe-only candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['trae', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'trae', command: 'npx' }),
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].canonicalAgentName, 'opencode');
+  assert.equal(plan.actions[0].canonicalProfileCandidate?.sourceAgentName, 'opencode');
+});
+
+test('planMcpGovernance records canonical target policy and reason for canonical candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['opencode', 'codex'],
+      definitions: [
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+        makeDefinition({ agentName: 'codex', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].canonicalTargetPolicy, 'alphabetical-write-ready-tiebreak');
+  assert.match(plan.actions[0].canonicalTargetReason ?? '', /alphabetical/i);
 });
 
 test('planMcpGovernance sends equivalent duplicate definitions with different scopes to manual review', () => {

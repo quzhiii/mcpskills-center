@@ -13,6 +13,7 @@ export interface McpGovernancePlanSummary {
   actionTypes: Record<string, McpGovernancePlanSummaryCount>;
   agentImpact: Record<string, McpGovernancePlanSummaryCount>;
   envRiskPolicies: Record<string, number>;
+  canonicalTargetPolicies: Record<string, number>;
 }
 
 export interface McpGovernancePlanSummaryCount {
@@ -33,6 +34,7 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     actionTypes: {},
     agentImpact: {},
     envRiskPolicies: {},
+    canonicalTargetPolicies: {},
   };
 
   for (const action of plan.actions) {
@@ -47,6 +49,9 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
       }
     }
     summary.envRiskPolicies[action.envRiskPolicy] = (summary.envRiskPolicies[action.envRiskPolicy] ?? 0) + 1;
+    if (action.canonicalTargetPolicy) {
+      summary.canonicalTargetPolicies[action.canonicalTargetPolicy] = (summary.canonicalTargetPolicies[action.canonicalTargetPolicy] ?? 0) + 1;
+    }
     for (const agentName of action.agentNames) {
       incrementSummary(summary.agentImpact, agentName, action);
     }
@@ -92,12 +97,12 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const canonicalCandidateActions = plan.actions.filter(action => action.canonicalProfileCandidate);
   if (canonicalCandidateActions.length > 0) {
-    lines.push('| Profile | MCP | Source Agent | Target Agents | Status | Scope | Env Policy | Scope Policy | Eligibility Reason |');
-    lines.push('|---------|-----|--------------|---------------|--------|-------|------------|--------------|--------------------|');
+    lines.push('| Profile | MCP | Source Agent | Target Agents | Status | Scope | Env Policy | Scope Policy | Canonical Target Policy | Canonical Target Reason | Eligibility Reason |');
+    lines.push('|---------|-----|--------------|---------------|--------|-------|------------|--------------|-------------------------|-------------------------|--------------------|');
     for (const action of canonicalCandidateActions) {
       const candidate = action.canonicalProfileCandidate;
       if (!candidate) continue;
-      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${escapeMarkdownTableCell(candidate.status ?? '-')} | ${escapeMarkdownTableCell(formatScope(candidate.scope))} | ${escapeMarkdownTableCell(candidate.envRiskPolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.eligibilityReason ?? '-')} |`);
+      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${escapeMarkdownTableCell(candidate.status ?? '-')} | ${escapeMarkdownTableCell(formatScope(candidate.scope))} | ${escapeMarkdownTableCell(candidate.envRiskPolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(action.canonicalTargetPolicy ?? candidate.canonicalTargetPolicy ?? '-')} | ${escapeMarkdownTableCell(action.canonicalTargetReason ?? candidate.canonicalTargetReason ?? '-')} | ${escapeMarkdownTableCell(candidate.eligibilityReason ?? '-')} |`);
     }
   } else {
     lines.push('No canonical profile candidates.');
