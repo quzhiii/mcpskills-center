@@ -814,7 +814,7 @@ test('executeCommand handles mcp apply --confirm', async () => {
           type: 'add-server' as const,
           mcpId: 'filesystem',
           targetAgentName: 'claude-code',
-          canonicalDefinition: { transport: 'stdio' as const, command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' as const } },
+          canonicalDefinition: { transport: 'stdio' as const, command: 'npx', isEnabled: true, canStart: true, hasSensitiveEnv: false, scope: { kind: 'global' as const } },
           reason: 'promote canonical MCP from governance action',
           requiresWrite: true,
         },
