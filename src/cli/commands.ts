@@ -26,7 +26,7 @@ export interface CommandContext {
   writeAllReports: (inventory: Inventory, audit: AuditReport, reportsDir: string) => Promise<void>;
   writeSyncPlanReports: (plan: SyncPlan, reportsDir: string) => Promise<void>;
   writeCapabilityMatrixReports: (matrix: import('../types/index.js').CapabilityMatrix, reportsDir: string) => Promise<void>;
-  writeMcpGovernancePlanReports?: (plan: McpGovernancePlan, reportsDir: string) => Promise<void>;
+  writeMcpGovernancePlanReports?: (plan: McpGovernancePlan, reportsDir: string, agents?: AgentConfig[]) => Promise<void>;
   loadProfiles: (profilesDir: string) => Promise<Profile[]>;
   listAgents: () => Promise<AgentConfig[]>;
   discoverAgents: () => Promise<AgentDiscoveryReport>;
@@ -95,8 +95,8 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
   const inventory = await context.runInventory();
   const normalized = normalizeInventory(inventory);
   const plan = planMcpGovernance(normalized);
-  await context.writeMcpGovernancePlanReports(plan, context.reportsDir);
-  const summary = buildMcpGovernancePlanSummary(plan);
+  await context.writeMcpGovernancePlanReports(plan, context.reportsDir, normalized.agents);
+  const summary = buildMcpGovernancePlanSummary(plan, normalized.agents);
 
   return [
     'MCP governance dry-run complete!',

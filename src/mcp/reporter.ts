@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { describeAgentSupport } from '../agents/support.js';
-import type { McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
+import { resolveAgentSupport } from '../agents/support.js';
+import type { AgentConfig, McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
 
 export interface McpGovernancePlanSummary {
   totalActions: number;
@@ -26,7 +26,10 @@ export interface McpGovernancePlanSummaryCount {
   actionTypes: Record<string, number>;
 }
 
-export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGovernancePlanSummary {
+export function buildMcpGovernancePlanSummary(
+  plan: McpGovernancePlan,
+  agents: AgentConfig[] = []
+): McpGovernancePlanSummary {
   const summary: McpGovernancePlanSummary = {
     totalActions: plan.actions.length,
     writeActions: plan.actions.filter(action => action.requiresWrite).length,
@@ -45,6 +48,7 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
   };
 
   const seenAgents = new Set<string>();
+  const agentsByName = new Map(agents.map(agent => [agent.name, agent]));
 
   for (const action of plan.actions) {
     incrementSummary(summary.actionTypes, action.type, action);
@@ -53,7 +57,7 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     if (action.canonicalProfileCandidate) summary.canonicalProfileEligible += 1;
     if (action.type === 'canonical-candidate') {
       const allWriteReady = action.agentNames.every(agentName => {
-        const support = describeAgentSupport(agentName);
+        const support = resolveGovernanceAgentSupport(agentName, agentsByName);
         return support.mcpApplySupport === 'write-ready' && support.mcpRestoreSupport === 'write-ready';
       });
       if (allWriteReady) summary.writeReadyCandidates += 1;
@@ -71,7 +75,7 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     for (const agentName of action.agentNames) {
       if (!seenAgents.has(agentName)) {
         seenAgents.add(agentName);
-        const support = describeAgentSupport(agentName);
+        const support = resolveGovernanceAgentSupport(agentName, agentsByName);
         if (support.mcpRestoreSupport === 'unproven') summary.restoreUnprovenAgentCount += 1;
         if (support.mcpConfigOwnershipConfidence === 'low') summary.lowOwnershipAgentCount += 1;
       }
@@ -82,9 +86,12 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
   return summary;
 }
 
-export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string {
+export function renderMcpGovernancePlanMarkdown(
+  plan: McpGovernancePlan,
+  agents: AgentConfig[] = []
+): string {
   const lines: string[] = [];
-  const summary = buildMcpGovernancePlanSummary(plan);
+  const summary = buildMcpGovernancePlanSummary(plan, agents);
 
   lines.push('# MCP Governance Dry-Run Plan');
   lines.push('');
@@ -158,15 +165,29 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   return lines.join('\n');
 }
 
-export async function writeMcpGovernancePlanReports(plan: McpGovernancePlan, reportsDir: string): Promise<void> {
+export async function writeMcpGovernancePlanReports(
+  plan: McpGovernancePlan,
+  reportsDir: string,
+  agents: AgentConfig[] = []
+): Promise<void> {
   const jsonPath = join(reportsDir, 'mcp-governance-plan-current.json');
   const markdownPath = join(reportsDir, 'mcp-governance-plan-current.md');
 
   await mkdir(dirname(jsonPath), { recursive: true });
   await Promise.all([
-    writeFile(jsonPath, JSON.stringify({ ...plan, summary: buildMcpGovernancePlanSummary(plan) }, null, 2), 'utf-8'),
-    writeFile(markdownPath, renderMcpGovernancePlanMarkdown(plan), 'utf-8'),
+    writeFile(jsonPath, JSON.stringify({ ...plan, summary: buildMcpGovernancePlanSummary(plan, agents) }, null, 2), 'utf-8'),
+    writeFile(markdownPath, renderMcpGovernancePlanMarkdown(plan, agents), 'utf-8'),
   ]);
+}
+
+function resolveGovernanceAgentSupport(
+  agentName: string,
+  agentsByName: ReadonlyMap<string, AgentConfig>
+) {
+  const agent = agentsByName.get(agentName);
+  if (agent) return resolveAgentSupport(agent);
+
+  return resolveAgentSupport({ name: agentName, id: agentName, scannerType: agentName });
 }
 
 function incrementSummary(target: Record<string, McpGovernancePlanSummaryCount>, key: string, action: McpGovernanceAction): void {

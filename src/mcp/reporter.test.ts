@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildMcpGovernancePlanSummary, renderMcpGovernancePlanMarkdown, writeMcpGovernancePlanReports } from './reporter.js';
-import type { McpGovernancePlan } from '../types/index.js';
+import type { AgentConfig, McpGovernancePlan } from '../types/index.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 
@@ -337,6 +337,45 @@ test('buildMcpGovernancePlanSummary includes write readiness counters', () => {
   assert.equal(summary.writeReadyCandidates, 1);
   assert.equal(summary.restoreUnprovenAgentCount, 1);
   assert.equal(summary.lowOwnershipAgentCount, 1);
+});
+
+test('renderMcpGovernancePlanMarkdown resolves write readiness through scannerType for custom agent installs', () => {
+  const plan: McpGovernancePlan = {
+    generatedAt: '2026-06-09T00:00:00.000Z',
+    actions: [
+      {
+        id: 'canonical-candidate:filesystem:0',
+        type: 'canonical-candidate',
+        mcpId: 'filesystem',
+        agentNames: ['custom-claude-install'],
+        canonicalAgentName: 'custom-claude-install',
+        canonicalProfileBlockers: [],
+        envRiskPolicy: 'no-env-risk-detected',
+        definitions: [],
+        reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
+        requiresWrite: false,
+      },
+    ],
+  };
+  const agents: AgentConfig[] = [
+    {
+      name: 'custom-claude-install',
+      id: 'custom-claude-install',
+      scannerType: 'claude-code',
+      configDir: 'C:/custom-claude',
+      skillsDir: 'C:/custom-claude/skills',
+    },
+  ];
+
+  const markdown = renderMcpGovernancePlanMarkdown(plan, agents);
+  const summary = buildMcpGovernancePlanSummary(plan, agents);
+
+  assert.match(markdown, /Write-ready candidates: 1/);
+  assert.match(markdown, /Restore-unproven agents: 0/);
+  assert.match(markdown, /Low-ownership agents: 0/);
+  assert.equal(summary.writeReadyCandidates, 1);
+  assert.equal(summary.restoreUnprovenAgentCount, 0);
+  assert.equal(summary.lowOwnershipAgentCount, 0);
 });
 
 test('writeMcpGovernancePlanReports preserves scope evidence when serializing reports', async () => {
