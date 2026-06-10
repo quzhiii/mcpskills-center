@@ -7,9 +7,13 @@ export interface McpGovernancePlanSummary {
   writeActions: number;
   canonicalCandidates: number;
   manualReviewActions: number;
+  canonicalProfileEligible: number;
+  canonicalProfileBlocked: number;
+  canonicalProfileBlockers: Record<string, number>;
   actionTypes: Record<string, McpGovernancePlanSummaryCount>;
   agentImpact: Record<string, McpGovernancePlanSummaryCount>;
   envRiskPolicies: Record<string, number>;
+  canonicalTargetPolicies: Record<string, number>;
 }
 
 export interface McpGovernancePlanSummaryCount {
@@ -24,16 +28,30 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     writeActions: plan.actions.filter(action => action.requiresWrite).length,
     canonicalCandidates: 0,
     manualReviewActions: 0,
+    canonicalProfileEligible: 0,
+    canonicalProfileBlocked: 0,
+    canonicalProfileBlockers: {},
     actionTypes: {},
     agentImpact: {},
     envRiskPolicies: {},
+    canonicalTargetPolicies: {},
   };
 
   for (const action of plan.actions) {
     incrementSummary(summary.actionTypes, action.type, action);
     if (action.type === 'canonical-candidate') summary.canonicalCandidates += 1;
     if (action.type === 'manual-review') summary.manualReviewActions += 1;
+    if (action.canonicalProfileCandidate) summary.canonicalProfileEligible += 1;
+    if (action.canonicalProfileBlockers && action.canonicalProfileBlockers.length > 0) {
+      summary.canonicalProfileBlocked += 1;
+      for (const blocker of action.canonicalProfileBlockers) {
+        summary.canonicalProfileBlockers[blocker] = (summary.canonicalProfileBlockers[blocker] ?? 0) + 1;
+      }
+    }
     summary.envRiskPolicies[action.envRiskPolicy] = (summary.envRiskPolicies[action.envRiskPolicy] ?? 0) + 1;
+    if (action.canonicalTargetPolicy) {
+      summary.canonicalTargetPolicies[action.canonicalTargetPolicy] = (summary.canonicalTargetPolicies[action.canonicalTargetPolicy] ?? 0) + 1;
+    }
     for (const agentName of action.agentNames) {
       incrementSummary(summary.agentImpact, agentName, action);
     }
@@ -66,10 +84,10 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const manualReviewActions = plan.actions.filter(action => action.type === 'manual-review');
   if (manualReviewActions.length > 0) {
-    lines.push('| MCP | Agents | Reason |');
-    lines.push('|-----|--------|--------|');
+    lines.push('| MCP | Agents | Scope Policy | Canonical Profile Blockers | Reason |');
+    lines.push('|-----|--------|--------------|----------------------------|--------|');
     for (const action of manualReviewActions) {
-      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.reason)} |`);
+      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(formatBlockers(action.canonicalProfileBlockers))} | ${escapeMarkdownTableCell(action.reason)} |`);
     }
   } else {
     lines.push('No manual review actions.');
@@ -79,12 +97,12 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   const canonicalCandidateActions = plan.actions.filter(action => action.canonicalProfileCandidate);
   if (canonicalCandidateActions.length > 0) {
-    lines.push('| Profile | MCP | Source Agent | Target Agents | Blocked By Env Risk |');
-    lines.push('|---------|-----|--------------|---------------|---------------------|');
+    lines.push('| Profile | MCP | Source Agent | Target Agents | Status | Scope | Env Policy | Scope Policy | Canonical Target Policy | Canonical Target Reason | Eligibility Reason |');
+    lines.push('|---------|-----|--------------|---------------|--------|-------|------------|--------------|-------------------------|-------------------------|--------------------|');
     for (const action of canonicalCandidateActions) {
       const candidate = action.canonicalProfileCandidate;
       if (!candidate) continue;
-      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${candidate.blockedByEnvRisk ? 'yes' : 'no'} |`);
+      lines.push(`| ${escapeMarkdownTableCell(candidate.profileId)} | ${escapeMarkdownTableCell(candidate.mcpId)} | ${escapeMarkdownTableCell(candidate.sourceAgentName)} | ${escapeMarkdownTableCell(candidate.agentNames.join(', '))} | ${escapeMarkdownTableCell(candidate.status ?? '-')} | ${escapeMarkdownTableCell(formatScope(candidate.scope))} | ${escapeMarkdownTableCell(candidate.envRiskPolicy ?? '-')} | ${escapeMarkdownTableCell(candidate.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(action.canonicalTargetPolicy ?? candidate.canonicalTargetPolicy ?? '-')} | ${escapeMarkdownTableCell(action.canonicalTargetReason ?? candidate.canonicalTargetReason ?? '-')} | ${escapeMarkdownTableCell(candidate.eligibilityReason ?? '-')} |`);
     }
   } else {
     lines.push('No canonical profile candidates.');
@@ -92,20 +110,20 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   lines.push('');
   lines.push('## Per-Agent Definitions');
   lines.push('');
-  lines.push('| MCP | Agent | Transport | Command | Host | Sensitive Env |');
-  lines.push('|-----|-------|-----------|---------|------|---------------|');
+  lines.push('| MCP | Agent | Transport | Command | Host | Sensitive Env | Scope |');
+  lines.push('|-----|-------|-----------|---------|------|---------------|-------|');
   for (const action of plan.actions) {
     for (const definition of action.definitions ?? []) {
-      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(definition.agentName)} | ${escapeMarkdownTableCell(definition.transport)} | ${formatValue(definition.command)} | ${formatValue(definition.host)} | ${definition.hasSensitiveEnv ? 'yes' : 'no'} |`);
+      lines.push(`| ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(definition.agentName)} | ${escapeMarkdownTableCell(definition.transport)} | ${formatValue(definition.command)} | ${formatValue(definition.host)} | ${definition.hasSensitiveEnv ? 'yes' : 'no'} | ${escapeMarkdownTableCell(formatScope(definition.scope))} |`);
     }
   }
   lines.push('');
   lines.push('## Actions');
   lines.push('');
-  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Requires Write | Reason |');
-  lines.push('|------|-----|--------|---------------------|-----------------|----------------|--------|');
+  lines.push('| Type | MCP | Agents | Canonical Candidate | Env Risk Policy | Scope Policy | Canonical Profile Blockers | Requires Write | Reason |');
+  lines.push('|------|-----|--------|---------------------|-----------------|--------------|----------------------------|----------------|--------|');
   for (const action of plan.actions) {
-    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
+    lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(formatBlockers(action.canonicalProfileBlockers))} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
   }
   lines.push('');
 
@@ -132,6 +150,15 @@ function incrementSummary(target: Record<string, McpGovernancePlanSummaryCount>,
 
 function formatValue(value: string | undefined): string {
   return value ? `\`${escapeMarkdownTableCell(value)}\`` : '-';
+}
+
+function formatScope(scope: { kind: string; id?: string } | undefined): string {
+  if (!scope) return '-';
+  return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
+}
+
+function formatBlockers(blockers: string[] | undefined): string {
+  return blockers && blockers.length > 0 ? blockers.join(', ') : 'none';
 }
 
 function escapeMarkdownTableCell(value: string): string {

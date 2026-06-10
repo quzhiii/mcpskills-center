@@ -28,6 +28,11 @@ test('writeAgentDiscoveryReports writes JSON and Markdown reports', async () => 
         support: {
           currentLevel: 'generic read-only placeholder',
           sourceOfTruthConfidence: 'low',
+          mcpReadSupport: 'native',
+          mcpPlanSupport: 'observe-only',
+          mcpApplySupport: 'observe-only',
+          mcpRestoreSupport: 'unproven',
+          mcpConfigOwnershipConfidence: 'low',
         },
       },
       {
@@ -39,6 +44,11 @@ test('writeAgentDiscoveryReports writes JSON and Markdown reports', async () => 
         support: {
           currentLevel: 'dedicated read-only',
           sourceOfTruthConfidence: 'low',
+          mcpReadSupport: 'native',
+          mcpPlanSupport: 'observe-only',
+          mcpApplySupport: 'observe-only',
+          mcpRestoreSupport: 'unproven',
+          mcpConfigOwnershipConfidence: 'low',
         },
       },
     ],
@@ -73,6 +83,11 @@ test('writeAgentDiscoveryReports renders all ambiguous discovery paths in Markdo
         support: {
           currentLevel: 'generic read-only placeholder',
           sourceOfTruthConfidence: 'low',
+          mcpReadSupport: 'native',
+          mcpPlanSupport: 'observe-only',
+          mcpApplySupport: 'observe-only',
+          mcpRestoreSupport: 'unproven',
+          mcpConfigOwnershipConfidence: 'low',
         },
       },
     ],

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planMcpGovernance } from './planner.js';
-import type { Inventory, MCPServer, MCPServerDefinition } from '../types/index.js';
+import type { Inventory, MCPServer, MCPServerDefinition, McpScopePolicy } from '../types/index.js';
 
 function makeDefinition(overrides: Partial<MCPServerDefinition>): MCPServerDefinition {
   return {
@@ -61,7 +61,9 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
   assert.deepEqual(plan.actions[0].agentNames, ['claude-code', 'opencode']);
   assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
   assert.equal(plan.actions[0].envRiskPolicy, 'no-env-risk-detected');
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), []);
   assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
+    status: 'eligible',
     profileId: 'filesystem',
     mcpId: 'filesystem',
     sourceAgentName: 'claude-code',
@@ -73,11 +75,238 @@ test('planMcpGovernance marks equivalent duplicate definitions as canonical cand
       isEnabled: true,
       canStart: null,
       hasSensitiveEnv: false,
+      scope: undefined,
     },
+    scope: undefined,
+    canonicalTargetPolicy: 'alphabetical-write-ready-tiebreak',
+    canonicalTargetReason: 'Canonical target selected by alphabetical tie-break among equally write-ready agents (claude-code)',
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
     blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
   });
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /equivalent duplicate/i);
+});
+
+test('planMcpGovernance keeps equivalent duplicate definitions with identical global scope as canonical candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'global' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(plan.actions[0].mcpId, 'filesystem');
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), []);
+  assert.equal(getScopePolicy(plan.actions[0]), 'no-scope-conflict-detected');
+  assert.deepEqual(plan.actions[0].canonicalProfileCandidate, {
+    status: 'eligible',
+    profileId: 'filesystem',
+    mcpId: 'filesystem',
+    sourceAgentName: 'claude-code',
+    agentNames: ['claude-code', 'opencode'],
+    definition: {
+      transport: 'stdio',
+      command: 'npx',
+      host: undefined,
+      isEnabled: true,
+      canStart: null,
+      hasSensitiveEnv: false,
+      scope: { kind: 'global' },
+    },
+    scope: { kind: 'global' },
+    canonicalTargetPolicy: 'alphabetical-write-ready-tiebreak',
+    canonicalTargetReason: 'Canonical target selected by alphabetical tie-break among equally write-ready agents (claude-code)',
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
+    blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
+  });
+});
+
+test('planMcpGovernance selects canonical target deterministically instead of using input order', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['opencode', 'claude-code'],
+      definitions: [
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+        makeDefinition({ agentName: 'claude-code', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(plan.actions[0].canonicalAgentName, 'claude-code');
+  assert.equal(plan.actions[0].canonicalProfileCandidate?.sourceAgentName, 'claude-code');
+});
+
+test('planMcpGovernance prefers write-ready canonical targets over observe-only candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['trae', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'trae', command: 'npx' }),
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].canonicalAgentName, 'opencode');
+  assert.equal(plan.actions[0].canonicalProfileCandidate?.sourceAgentName, 'opencode');
+});
+
+test('planMcpGovernance records canonical target policy and reason for canonical candidates', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['opencode', 'codex'],
+      definitions: [
+        makeDefinition({ agentName: 'opencode', command: 'npx' }),
+        makeDefinition({ agentName: 'codex', command: 'npx' }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].canonicalTargetPolicy, 'alphabetical-write-ready-tiebreak');
+  assert.match(plan.actions[0].canonicalTargetReason ?? '', /alphabetical/i);
+});
+
+test('planMcpGovernance sends equivalent duplicate definitions with different scopes to manual review', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].mcpId, 'filesystem');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), ['scope-conflict']);
+  assert.equal(plan.actions[0].requiresWrite, false);
+  assert.match(plan.actions[0].reason, /scope conflict/i);
+});
+
+test('planMcpGovernance calls out global and project duplicate scope conflicts explicitly', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'global' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[0].reason, /global/i);
+  assert.match(plan.actions[0].reason, /project:project-one/i);
+});
+
+test('planMcpGovernance keeps same-project scoped duplicates canonical when otherwise equivalent', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'filesystem',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+        makeDefinition({ agentName: 'opencode', command: 'npx', scope: { kind: 'project', id: 'project-one' } }),
+      ],
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].type, 'canonical-candidate');
+  assert.equal(getScopePolicy(plan.actions[0]), 'no-scope-conflict-detected');
+});
+
+test('planMcpGovernance keeps env and transport review precedence over scope mismatch', () => {
+  const inventory = makeInventory([
+    makeMcp({
+      id: 'secrets',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', command: 'npx', hasSensitiveEnv: true, scope: { kind: 'global' } }),
+        makeDefinition({
+          agentName: 'opencode',
+          command: 'npx',
+          hasSensitiveEnv: true,
+          scope: { kind: 'project', id: 'project-one' },
+        }),
+      ],
+      isDuplicate: true,
+      hasSensitiveEnv: true,
+    }),
+    makeMcp({
+      id: 'unknown-server',
+      agentSources: ['claude-code', 'opencode'],
+      definitions: [
+        makeDefinition({ agentName: 'claude-code', transport: 'unknown', command: undefined, scope: { kind: 'global' } }),
+        makeDefinition({
+          agentName: 'opencode',
+          transport: 'unknown',
+          command: undefined,
+          scope: { kind: 'project', id: 'project-one' },
+        }),
+      ],
+      transport: 'unknown',
+      command: undefined,
+      isDuplicate: true,
+    }),
+  ]);
+
+  const plan = planMcpGovernance(inventory);
+
+  assert.equal(plan.actions[0].type, 'manual-review');
+  assert.equal(plan.actions[0].envRiskPolicy, 'sensitive-env-blocks-canonicalization');
+  assert.equal(getScopePolicy(plan.actions[0]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[0].reason, /sensitive env risk/i);
+  assert.doesNotMatch(plan.actions[0].reason, /scope conflict/i);
+  assert.equal(plan.actions[1].type, 'manual-review');
+  assert.equal(plan.actions[1].envRiskPolicy, 'unknown-transport-requires-review');
+  assert.equal(getScopePolicy(plan.actions[1]), 'scope-conflict-requires-review');
+  assert.match(plan.actions[1].reason, /unknown transport/i);
+  assert.doesNotMatch(plan.actions[1].reason, /scope conflict/i);
 });
 
 test('planMcpGovernance skips single-agent definitions with an explicit reason', () => {
@@ -96,6 +325,7 @@ test('planMcpGovernance skips single-agent definitions with an explicit reason',
   assert.equal(plan.actions[0].type, 'skip');
   assert.equal(plan.actions[0].mcpId, 'memory');
   assert.deepEqual(plan.actions[0].agentNames, ['claude-code']);
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), ['single-agent']);
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /one agent/i);
 });
@@ -120,6 +350,7 @@ test('planMcpGovernance sends drifted duplicate definitions to manual review wit
   assert.equal(plan.actions[0].mcpId, 'filesystem');
   assert.deepEqual(plan.actions[0].agentNames, ['claude-code', 'opencode']);
   assert.deepEqual(plan.actions[0].definitions?.map(definition => definition.command), ['npx', 'node']);
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), ['definition-drift']);
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /drift/i);
 });
@@ -144,6 +375,7 @@ test('planMcpGovernance sends sensitive env definitions to manual review with en
   assert.equal(plan.actions[0].type, 'manual-review');
   assert.equal(plan.actions[0].mcpId, 'secrets');
   assert.equal(plan.actions[0].envRiskPolicy, 'sensitive-env-blocks-canonicalization');
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), ['sensitive-env']);
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /sensitive env risk/i);
 });
@@ -169,6 +401,15 @@ test('planMcpGovernance sends unknown transport definitions to manual review wit
   assert.equal(plan.actions[0].type, 'manual-review');
   assert.equal(plan.actions[0].mcpId, 'unknown-server');
   assert.equal(plan.actions[0].envRiskPolicy, 'unknown-transport-requires-review');
+  assert.deepEqual(getCanonicalProfileBlockers(plan.actions[0]), ['unknown-transport']);
   assert.equal(plan.actions[0].requiresWrite, false);
   assert.match(plan.actions[0].reason, /unknown transport/i);
 });
+
+function getScopePolicy(action: { scopePolicy?: McpScopePolicy }): McpScopePolicy | undefined {
+  return action.scopePolicy;
+}
+
+function getCanonicalProfileBlockers(action: unknown): string[] | undefined {
+  return (action as { canonicalProfileBlockers?: string[] }).canonicalProfileBlockers;
+}

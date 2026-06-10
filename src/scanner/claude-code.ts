@@ -68,6 +68,18 @@ export class ClaudeCodeScanner extends BaseScanner {
       return parseClaudeCodeMcpConfig(content).map(server => ({
             id: server.id,
             agentSources: [this.agentConfig.name],
+            definitions: [
+              {
+                agentName: this.agentConfig.name,
+                transport: server.transport,
+                command: server.command,
+                host: server.host,
+                isEnabled: server.isEnabled,
+                canStart: null,
+                hasSensitiveEnv: server.hasSensitiveEnv,
+                scope: server.scope,
+              },
+            ],
             transport: server.transport,
             command: server.command,
             host: server.host,

@@ -36,6 +36,7 @@ test('OpenCode MCP scanner reads UTF-8 BOM-prefixed JSON config', async () => {
   assert.equal(servers[0].id, 'web');
   assert.equal(servers[0].transport, 'http');
   assert.equal(servers[0].host, 'https://example.com/mcp');
+  assert.deepEqual(servers[0].definitions?.[0]?.scope, { kind: 'global' });
 });
 
 test('OpenCode MCP scanner detects sensitive env keys', async () => {

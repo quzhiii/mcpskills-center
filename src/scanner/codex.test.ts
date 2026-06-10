@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CodexScanner } from './codex.js';
 import { createTempAgentRoot, withSuppressedConsoleWarn } from './test-utils.js';
-import type { AgentConfig } from '../types/index.js';
+import type { AgentConfig, MCPServer, McpAdapterScope } from '../types/index.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 
@@ -44,8 +44,10 @@ url = "https://example.com/mcp"
   assert.equal(servers.length, 2);
   assert.equal(servers.find(server => server.id === 'agentmemory')?.transport, 'stdio');
   assert.equal(servers.find(server => server.id === 'agentmemory')?.hasSensitiveEnv, true);
+  assert.deepEqual(firstDefinitionScope(servers.find(server => server.id === 'agentmemory')), { kind: 'global' });
   assert.equal(servers.find(server => server.id === 'reader')?.transport, 'http');
   assert.equal(servers.find(server => server.id === 'reader')?.host, 'https://example.com/mcp');
+  assert.deepEqual(firstDefinitionScope(servers.find(server => server.id === 'reader')), { kind: 'global' });
 });
 
 test('Codex MCP scanner returns no servers for missing config file', async () => {
@@ -63,3 +65,7 @@ test('Codex MCP scanner returns no servers for missing config file', async () =>
 
   assert.deepEqual(servers, []);
 });
+
+function firstDefinitionScope(server: MCPServer | undefined): McpAdapterScope | undefined {
+  return server?.definitions?.[0]?.scope;
+}

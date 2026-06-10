@@ -1,4 +1,13 @@
-import type { Inventory, MCPServer, MCPServerDefinition, McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
+import { describeAgentSupport } from '../agents/support.js';
+import type { AgentSupportConfidence, McpApplySupport, McpRestoreSupport } from '../agents/support.js';
+import type {
+  Inventory,
+  MCPServer,
+  MCPServerDefinition,
+  McpCanonicalTargetPolicy,
+  McpGovernanceAction,
+  McpGovernancePlan,
+} from '../types/index.js';
 
 export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
   const actions: McpGovernanceAction[] = [];
@@ -14,7 +23,9 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['single-agent'],
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server is configured in only one agent; no governance action is needed',
       }));
       continue;
@@ -27,7 +38,9 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['unknown-transport'],
         envRiskPolicy: 'unknown-transport-requires-review',
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has unknown transport and must be reviewed before canonicalization',
       }));
       continue;
@@ -40,8 +53,25 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['sensitive-env'],
         envRiskPolicy: 'sensitive-env-blocks-canonicalization',
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
+      }));
+      continue;
+    }
+
+    if (hasScopeConflict(definitions)) {
+      actions.push(createAction({
+        index: actions.length,
+        type: 'manual-review',
+        mcp,
+        definitions,
+        agentNames,
+        canonicalProfileBlockers: ['scope-conflict'],
+        envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: 'scope-conflict-requires-review',
+        reason: `MCP duplicate definitions have a scope conflict (${describeScopes(definitions)}) and require manual review`,
       }));
       continue;
     }
@@ -53,11 +83,15 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
         mcp,
         definitions,
         agentNames,
+        canonicalProfileBlockers: ['definition-drift'],
         envRiskPolicy: classifyEnvRiskPolicy(definitions),
+        scopePolicy: classifyScopePolicy(definitions),
         reason: 'MCP duplicate definitions drift across agents and require manual review',
       }));
       continue;
     }
+
+    const canonicalTarget = selectCanonicalTarget(definitions);
 
     actions.push(createAction({
       index: actions.length,
@@ -65,9 +99,13 @@ export function planMcpGovernance(inventory: Inventory): McpGovernancePlan {
       mcp,
       definitions,
       agentNames,
-      canonicalAgentName: agentNames[0],
-      canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, definitions, agentNames),
+      canonicalAgentName: canonicalTarget.definition.agentName,
+      canonicalTargetPolicy: canonicalTarget.policy,
+      canonicalTargetReason: canonicalTarget.reason,
+      canonicalProfileCandidate: createCanonicalProfileCandidate(mcp, canonicalTarget.definition, agentNames, canonicalTarget),
+      canonicalProfileBlockers: [],
       envRiskPolicy: 'no-env-risk-detected',
+      scopePolicy: 'no-scope-conflict-detected',
       reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
     }));
   }
@@ -85,8 +123,12 @@ function createAction(args: {
   definitions: MCPServerDefinition[];
   agentNames: string[];
   canonicalAgentName?: string;
+  canonicalTargetPolicy?: McpGovernanceAction['canonicalTargetPolicy'];
+  canonicalTargetReason?: McpGovernanceAction['canonicalTargetReason'];
   canonicalProfileCandidate?: McpGovernanceAction['canonicalProfileCandidate'];
+  canonicalProfileBlockers?: McpGovernanceAction['canonicalProfileBlockers'];
   envRiskPolicy: McpGovernanceAction['envRiskPolicy'];
+  scopePolicy: McpGovernanceAction['scopePolicy'];
   reason: string;
 }): McpGovernanceAction {
   return {
@@ -95,8 +137,12 @@ function createAction(args: {
     mcpId: args.mcp.id,
     agentNames: args.agentNames,
     canonicalAgentName: args.canonicalAgentName,
+    canonicalTargetPolicy: args.canonicalTargetPolicy,
+    canonicalTargetReason: args.canonicalTargetReason,
     canonicalProfileCandidate: args.canonicalProfileCandidate,
+    canonicalProfileBlockers: args.canonicalProfileBlockers,
     envRiskPolicy: args.envRiskPolicy,
+    scopePolicy: args.scopePolicy,
     definitions: args.definitions,
     reason: args.reason,
     requiresWrite: false,
@@ -148,13 +194,32 @@ function classifyEnvRiskPolicy(definitions: MCPServerDefinition[]): McpGovernanc
   return 'no-env-risk-detected';
 }
 
+function classifyScopePolicy(definitions: MCPServerDefinition[]): McpGovernanceAction['scopePolicy'] {
+  return hasScopeConflict(definitions) ? 'scope-conflict-requires-review' : 'no-scope-conflict-detected';
+}
+
+function hasScopeConflict(definitions: MCPServerDefinition[]): boolean {
+  return new Set(definitions.map(definition => normalizeScope(definition))).size > 1;
+}
+
+function normalizeScope(definition: MCPServerDefinition): string {
+  const scope = definition.scope;
+  if (!scope) return 'unknown';
+  return scope.id ? `${scope.kind}:${scope.id}` : scope.kind;
+}
+
+function describeScopes(definitions: MCPServerDefinition[]): string {
+  return [...new Set(definitions.map(definition => normalizeScope(definition)))].join(', ');
+}
+
 function createCanonicalProfileCandidate(
   mcp: MCPServer,
-  definitions: MCPServerDefinition[],
-  agentNames: string[]
+  sourceDefinition: MCPServerDefinition,
+  agentNames: string[],
+  canonicalTarget: { policy: McpCanonicalTargetPolicy; reason: string }
 ): NonNullable<McpGovernanceAction['canonicalProfileCandidate']> {
-  const sourceDefinition = definitions[0];
   return {
+    status: 'eligible',
     profileId: mcp.id,
     mcpId: mcp.id,
     sourceAgentName: sourceDefinition.agentName,
@@ -166,7 +231,67 @@ function createCanonicalProfileCandidate(
       isEnabled: sourceDefinition.isEnabled,
       canStart: sourceDefinition.canStart,
       hasSensitiveEnv: sourceDefinition.hasSensitiveEnv,
+      scope: sourceDefinition.scope,
     },
+    scope: sourceDefinition.scope,
+    canonicalTargetPolicy: canonicalTarget.policy,
+    canonicalTargetReason: canonicalTarget.reason,
+    envRiskPolicy: 'no-env-risk-detected',
+    scopePolicy: 'no-scope-conflict-detected',
+    blockers: [],
     blockedByEnvRisk: false,
+    eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
   };
+}
+
+function selectCanonicalTarget(definitions: MCPServerDefinition[]): {
+  definition: MCPServerDefinition;
+  policy: McpCanonicalTargetPolicy;
+  reason: string;
+} {
+  const ranked = [...definitions].sort(compareCanonicalTargetDefinitions);
+  const best = ranked[0];
+  const next = ranked[1];
+
+  if (!best) {
+    throw new Error('canonical target selection requires at least one definition');
+  }
+
+  const bestSupport = describeAgentSupport(best.agentName);
+  const nextSupport = next ? describeAgentSupport(next.agentName) : undefined;
+  const tiedOnSupport = next
+    ? bestSupport.mcpApplySupport === nextSupport?.mcpApplySupport
+      && bestSupport.mcpRestoreSupport === nextSupport?.mcpRestoreSupport
+      && bestSupport.mcpConfigOwnershipConfidence === nextSupport?.mcpConfigOwnershipConfidence
+      && bestSupport.sourceOfTruthConfidence === nextSupport?.sourceOfTruthConfidence
+    : false;
+
+  return {
+    definition: best,
+    policy: tiedOnSupport ? 'alphabetical-write-ready-tiebreak' : 'highest-ownership-write-ready',
+    reason: tiedOnSupport
+      ? `Canonical target selected by alphabetical tie-break among equally write-ready agents (${best.agentName})`
+      : `Canonical target selected from highest-confidence write-ready agent (${best.agentName})`,
+  };
+}
+
+function compareCanonicalTargetDefinitions(left: MCPServerDefinition, right: MCPServerDefinition): number {
+  const leftSupport = describeAgentSupport(left.agentName);
+  const rightSupport = describeAgentSupport(right.agentName);
+
+  return (
+    compareSupportFlag(leftSupport.mcpApplySupport, rightSupport.mcpApplySupport, { 'write-ready': 1, 'observe-only': 0 })
+    || compareSupportFlag(leftSupport.mcpRestoreSupport, rightSupport.mcpRestoreSupport, { 'write-ready': 1, unproven: 0 })
+    || compareSupportFlag(leftSupport.mcpConfigOwnershipConfidence, rightSupport.mcpConfigOwnershipConfidence, { high: 2, medium: 1, low: 0 })
+    || compareSupportFlag(leftSupport.sourceOfTruthConfidence, rightSupport.sourceOfTruthConfidence, { high: 2, medium: 1, low: 0 })
+    || left.agentName.localeCompare(right.agentName)
+  );
+}
+
+function compareSupportFlag<T extends string>(
+  left: T,
+  right: T,
+  weights: Record<T, number>
+): number {
+  return weights[right] - weights[left];
 }

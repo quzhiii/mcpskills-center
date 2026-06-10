@@ -104,8 +104,13 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
     `   Governance Actions: ${plan.actions.length}`,
     `   Canonical Candidates: ${summary.canonicalCandidates}`,
     `   Manual Review: ${summary.manualReviewActions}`,
+    `   Canonical Profile Eligible: ${summary.canonicalProfileEligible}`,
+    `   Canonical Profile Blocked: ${summary.canonicalProfileBlocked}`,
+    `   Canonical Profile Blockers: ${formatActionTypeCounts(summary.canonicalProfileBlockers)}`,
     `   Write Actions: ${summary.writeActions}`,
     `   Env Risk Policies: ${formatActionTypeCounts(summary.envRiskPolicies)}`,
+    `   Canonical Target Policies: ${formatActionTypeCounts(summary.canonicalTargetPolicies)}`,
+    `   Scope Policies: ${formatActionTypeCounts(countMcpScopePolicies(plan.actions))}`,
     `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
     '',
     `   Reports written to: ${context.reportsDir}`,
@@ -319,6 +324,15 @@ function countRestoreActionTypes(entries: Array<{ actionId: string }>): Record<s
   for (const entry of entries) {
     const actionType = entry.actionId.split(':')[0] || 'unknown';
     counts[actionType] = (counts[actionType] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function countMcpScopePolicies(actions: Array<{ scopePolicy?: string }>): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const action of actions) {
+    if (!action.scopePolicy) continue;
+    counts[action.scopePolicy] = (counts[action.scopePolicy] ?? 0) + 1;
   }
   return counts;
 }

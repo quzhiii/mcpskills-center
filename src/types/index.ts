@@ -79,6 +79,7 @@ export interface MCPServerDefinition {
   isEnabled: boolean;
   canStart: boolean | null;
   hasSensitiveEnv: boolean;
+  scope?: McpAdapterScope;
 }
 
 export type McpAdapterScopeKind = 'global' | 'project' | 'workspace' | 'unknown';
@@ -109,8 +110,12 @@ export interface McpGovernanceAction {
   mcpId: string;
   agentNames: string[];
   canonicalAgentName?: string;
+  canonicalTargetPolicy?: McpCanonicalTargetPolicy;
+  canonicalTargetReason?: string;
   canonicalProfileCandidate?: McpCanonicalProfileCandidate;
+  canonicalProfileBlockers?: McpCanonicalProfileBlocker[];
   envRiskPolicy: McpEnvRiskPolicy;
+  scopePolicy?: McpScopePolicy;
   definitions?: MCPServerDefinition[];
   reason: string;
   requiresWrite: false;
@@ -118,13 +123,29 @@ export interface McpGovernanceAction {
 
 export type McpEnvRiskPolicy = 'no-env-risk-detected' | 'sensitive-env-blocks-canonicalization' | 'unknown-transport-requires-review';
 
+export type McpScopePolicy = 'no-scope-conflict-detected' | 'scope-conflict-requires-review';
+
+export type McpCanonicalTargetPolicy = 'highest-ownership-write-ready' | 'alphabetical-write-ready-tiebreak';
+
+export type McpCanonicalProfileStatus = 'eligible';
+
+export type McpCanonicalProfileBlocker = 'single-agent' | 'unknown-transport' | 'sensitive-env' | 'scope-conflict' | 'definition-drift';
+
 export interface McpCanonicalProfileCandidate {
+  status?: McpCanonicalProfileStatus;
   profileId: string;
   mcpId: string;
   sourceAgentName: string;
   agentNames: string[];
   definition: Omit<MCPServerDefinition, 'agentName'>;
+  scope?: McpAdapterScope;
+  canonicalTargetPolicy?: McpCanonicalTargetPolicy;
+  canonicalTargetReason?: string;
+  envRiskPolicy?: McpEnvRiskPolicy;
+  scopePolicy?: McpScopePolicy;
+  blockers?: McpCanonicalProfileBlocker[];
   blockedByEnvRisk: boolean;
+  eligibilityReason?: string;
 }
 
 export interface Profile {
