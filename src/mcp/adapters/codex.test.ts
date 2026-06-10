@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCodexMcpConfig } from './codex.js';
+import { parseCodexMcpConfig, serializeCodexMcpConfig } from './codex.js';
+import type { ParsedMcpConfigServer } from './base.js';
 
 test('Codex adapter parses TOML mcp_servers', () => {
   const servers = parseCodexMcpConfig(`
@@ -44,4 +45,29 @@ command = ["npx", "-y", "@agentmemory/mcp"]
   assert.equal(servers.length, 1);
   assert.equal(servers[0].transport, 'stdio');
   assert.equal(servers[0].command, 'npx');
+});
+
+test('serializeCodexMcpConfig produces valid TOML with mcp_servers', () => {
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'filesystem', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeCodexMcpConfig(servers);
+  assert.ok(result.includes('[mcp_servers.filesystem]'));
+  assert.ok(result.includes('command'));
+  assert.ok(result.includes('npx'));
+});
+
+test('serializeCodexMcpConfig handles multiple servers', () => {
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'fs', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+    { id: 'web', transport: 'http', host: 'http://localhost:3000', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeCodexMcpConfig(servers);
+  assert.ok(result.includes('[mcp_servers.fs]'));
+  assert.ok(result.includes('[mcp_servers.web]'));
+});
+
+test('serializeCodexMcpConfig handles empty server list', () => {
+  const result = serializeCodexMcpConfig([]);
+  assert.ok(typeof result === 'string');
 });
