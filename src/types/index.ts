@@ -148,6 +148,56 @@ export interface McpCanonicalProfileCandidate {
   eligibilityReason?: string;
 }
 
+export type McpApplyActionType = 'add-server' | 'update-server' | 'remove-server' | 'enable-server' | 'disable-server';
+
+export interface McpApplyAction {
+  id: string;
+  type: McpApplyActionType;
+  mcpId: string;
+  targetAgentName: string;
+  canonicalDefinition?: Omit<MCPServerDefinition, 'agentName'>;
+  reason: string;
+  requiresWrite: true;
+}
+
+export interface McpApplyPlan {
+  generatedAt: string;
+  confirm: boolean;
+  actions: McpApplyAction[];
+  approvedRoots: string[];
+}
+
+export interface McpApplyReceipt {
+  actionId: string;
+  type: McpApplyActionType;
+  mcpId: string;
+  targetAgentName: string;
+  targetConfigPath: string;
+  backupPath?: string;
+  appliedAt: string;
+}
+
+export interface McpApplyResult {
+  manifestPath: string;
+  appliedActions: McpApplyAction[];
+  backupEntries: McpBackupEntry[];
+  receipts: McpApplyReceipt[];
+}
+
+export interface McpBackupEntry {
+  mcpId: string;
+  targetAgentName: string;
+  targetConfigPath: string;
+  backupPath: string;
+  backedUpAt: string;
+}
+
+export interface McpBackupManifest {
+  generatedAt: string;
+  entries: McpBackupEntry[];
+  sourcePlanGeneratedAt: string;
+}
+
 export interface Profile {
   name: string;
   description: string;
