@@ -71,6 +71,43 @@ function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
   return Object.keys(env).some(key => sensitiveKeys.some(s => key.toLowerCase().includes(s)));
 }
 
-export const serializeClaudeCodeMcpConfig: McpConfigAdapter['serialize'] = (_servers: ParsedMcpConfigServer[]): string => {
-  throw new Error('MCP config write not yet implemented for this adapter');
+export const serializeClaudeCodeMcpConfig: McpConfigAdapter['serialize'] = (servers: ParsedMcpConfigServer[], existingContent?: string): string => {
+  const existing: Record<string, unknown> = existingContent
+    ? JSON.parse(existingContent)
+    : {};
+
+  const globalServers: Record<string, unknown> = {};
+  const projectServers: Record<string, Record<string, unknown>> = {};
+
+  for (const server of servers) {
+    const serverObj: Record<string, unknown> = {};
+    if (server.command !== undefined) serverObj.command = server.command;
+    if (server.host !== undefined) serverObj.url = server.host;
+
+    if (server.scope.kind === 'global') {
+      const name = server.id.startsWith('global:')
+        ? server.id.slice('global:'.length)
+        : server.id;
+      globalServers[name] = serverObj;
+    } else if (server.scope.kind === 'project' && server.scope.id) {
+      const projectId = server.scope.id;
+      const name = server.id.slice(projectId.length + 1);
+      if (!projectServers[projectId]) projectServers[projectId] = {};
+      projectServers[projectId][name] = serverObj;
+    }
+  }
+
+  const result: Record<string, unknown> = { ...existing };
+  result.mcpServers = globalServers;
+
+  if (Object.keys(projectServers).length > 0) {
+    const existingProjects = asRecord(result.projects);
+    for (const [pid, serversMap] of Object.entries(projectServers)) {
+      const existingProject = asRecord(existingProjects[pid]);
+      existingProjects[pid] = { ...existingProject, mcpServers: serversMap };
+    }
+    result.projects = existingProjects;
+  }
+
+  return JSON.stringify(result, null, 2);
 };

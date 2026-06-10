@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseClaudeCodeMcpConfig } from './claude-code.js';
+import { parseClaudeCodeMcpConfig, serializeClaudeCodeMcpConfig } from './claude-code.js';
+import type { ParsedMcpConfigServer } from './base.js';
 
 test('Claude Code adapter parses global and project MCP servers with scope metadata', () => {
   const servers = parseClaudeCodeMcpConfig(
@@ -52,4 +53,53 @@ test('Claude Code adapter treats array-form command values as stdio', () => {
   assert.equal(servers[0].id, 'global:fetcher');
   assert.equal(servers[0].transport, 'stdio');
   assert.equal(servers[0].command, 'npx');
+});
+
+test('serializeClaudeCodeMcpConfig adds a global server to existing config', () => {
+  const existing = JSON.stringify({
+    mcpServers: { existing: { command: 'node' } },
+  });
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'global:existing', transport: 'stdio', command: 'node', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+    { id: 'global:newserver', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeClaudeCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.ok(parsed.mcpServers.existing);
+  assert.ok(parsed.mcpServers.newserver);
+  assert.equal(parsed.mcpServers.newserver.command, 'npx');
+});
+
+test('serializeClaudeCodeMcpConfig adds a project-scoped server', () => {
+  const existing = JSON.stringify({});
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'myproject:reader', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'project', id: 'myproject' } },
+  ];
+  const result = serializeClaudeCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.ok(parsed.projects.myproject.mcpServers.reader);
+});
+
+test('serializeClaudeCodeMcpConfig preserves existing non-MCP config fields', () => {
+  const existing = JSON.stringify({
+    apiKey: 'test',
+    otherSetting: true,
+    mcpServers: { old: { command: 'node' } },
+  });
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'global:old', transport: 'stdio', command: 'node', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeClaudeCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.equal(parsed.apiKey, 'test');
+  assert.equal(parsed.otherSetting, true);
+});
+
+test('serializeClaudeCodeMcpConfig handles no existing content', () => {
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'global:fs', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeClaudeCodeMcpConfig(servers);
+  const parsed = JSON.parse(result);
+  assert.ok(parsed.mcpServers.fs);
 });
