@@ -4,6 +4,7 @@ import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
 import { buildCapabilityMatrix } from '../matrix/capability.js';
 import { planMcpGovernance } from '../mcp/planner.js';
+import { buildMcpApplyPlan } from '../mcp/apply-plan.js';
 import { buildMcpGovernancePlanSummary } from '../mcp/reporter.js';
 import { normalizeInventory } from '../normalizer/index.js';
 import { planProfile } from '../profiles/planner.js';
@@ -13,6 +14,8 @@ import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
+import type { applyMcpPlan } from '../mcp/apply.js';
+import type { restoreMcpBackupManifest } from '../mcp/restore.js';
 
 export interface CommandContext {
   reportsDir: string;
@@ -33,6 +36,8 @@ export interface CommandContext {
   writeAgentDiscoveryReports: (report: AgentDiscoveryReport, reportsDir: string) => Promise<void>;
   applySyncPlan: typeof applySyncPlan;
   restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
+  applyMcpPlan?: typeof applyMcpPlan;
+  restoreMcpBackupManifest?: typeof restoreMcpBackupManifest;
 }
 
 export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
@@ -74,6 +79,8 @@ export function renderHelp(): string {
     '  agents list                  List registered local agents',
     '  agents discover              Discover local agent config candidates',
     '  mcp plan                     Generate MCP governance dry-run plan and reports',
+    '  mcp apply --confirm          Apply MCP governance plan with backups',
+    '  mcp restore <manifest>       Restore MCP config from backup manifest',
     '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
@@ -84,40 +91,78 @@ export function renderHelp(): string {
 async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string> {
   const subcommand = cli.options.subcommand ?? 'plan';
 
-  if (subcommand !== 'plan') {
-    return 'Usage: node dist/index.js mcp plan';
+  if (subcommand === 'apply') {
+    if (!context.applyMcpPlan) throw new Error('MCP apply is not configured');
+    const inventory = await context.runInventory();
+    const normalized = normalizeInventory(inventory);
+    const governancePlan = planMcpGovernance(normalized);
+    const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+    const applyPlan = buildMcpApplyPlan(governancePlan, Object.values(agentConfigPaths));
+    applyPlan.confirm = cli.options.confirm;
+    const result = await context.applyMcpPlan(applyPlan, {
+      backupsDir: context.backupsDir,
+      agentConfigPaths,
+    });
+    return [
+      'MCP apply complete!',
+      `   Applied Actions: ${result.appliedActions.length}`,
+      `   Backup Entries: ${result.backupEntries.length}`,
+      `   Receipts: ${result.receipts.length}`,
+      `   Manifest: ${result.manifestPath}`,
+    ].join('\n');
   }
 
-  if (!context.writeMcpGovernancePlanReports) {
-    throw new Error('MCP governance plan report writer is not configured');
+  if (subcommand === 'restore') {
+    if (!context.restoreMcpBackupManifest) throw new Error('MCP restore is not configured');
+    const manifestPath = cli.options.profileName;
+    if (!manifestPath) throw new Error('Usage: node dist/index.js mcp restore <manifest-path>');
+    const inventory = await context.runInventory();
+    const normalized = normalizeInventory(inventory);
+    const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+    const result = await context.restoreMcpBackupManifest(manifestPath, {
+      approvedRoots: Object.values(agentConfigPaths),
+    });
+    return [
+      'MCP restore complete!',
+      `   Restored Entries: ${result.restoredEntries.length}`,
+      `   Manifest: ${manifestPath}`,
+    ].join('\n');
   }
 
-  const inventory = await context.runInventory();
-  const normalized = normalizeInventory(inventory);
-  const plan = planMcpGovernance(normalized);
-  await context.writeMcpGovernancePlanReports(plan, context.reportsDir, normalized.agents);
-  const summary = buildMcpGovernancePlanSummary(plan, normalized.agents);
+  if (subcommand === 'plan') {
+    if (!context.writeMcpGovernancePlanReports) {
+      throw new Error('MCP governance plan report writer is not configured');
+    }
 
-  return [
-    'MCP governance dry-run complete!',
-    `   MCP Servers: ${normalized.mcpServers.length}`,
-    `   Governance Actions: ${plan.actions.length}`,
-    `   Canonical Candidates: ${summary.canonicalCandidates}`,
-    `   Manual Review: ${summary.manualReviewActions}`,
-    `   Canonical Profile Eligible: ${summary.canonicalProfileEligible}`,
-    `   Canonical Profile Blocked: ${summary.canonicalProfileBlocked}`,
-    `   Canonical Profile Blockers: ${formatActionTypeCounts(summary.canonicalProfileBlockers)}`,
-    `   Write Actions: ${summary.writeActions}`,
-    `   Env Risk Policies: ${formatActionTypeCounts(summary.envRiskPolicies)}`,
-    `   Canonical Target Policies: ${formatActionTypeCounts(summary.canonicalTargetPolicies)}`,
-    `   Scope Policies: ${formatActionTypeCounts(countMcpScopePolicies(plan.actions))}`,
-    `   Write-Ready Candidates: ${summary.writeReadyCandidates}`,
-    `   Restore-Unproven Agents: ${summary.restoreUnprovenAgentCount}`,
-    `   Low-Ownership Agents: ${summary.lowOwnershipAgentCount}`,
-    `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
-    '',
-    `   Reports written to: ${context.reportsDir}`,
-  ].join('\n');
+    const inventory = await context.runInventory();
+    const normalized = normalizeInventory(inventory);
+    const plan = planMcpGovernance(normalized);
+    await context.writeMcpGovernancePlanReports(plan, context.reportsDir, normalized.agents);
+    const summary = buildMcpGovernancePlanSummary(plan, normalized.agents);
+
+    return [
+      'MCP governance dry-run complete!',
+      `   MCP Servers: ${normalized.mcpServers.length}`,
+      `   Governance Actions: ${plan.actions.length}`,
+      `   Canonical Candidates: ${summary.canonicalCandidates}`,
+      `   Manual Review: ${summary.manualReviewActions}`,
+      `   Canonical Profile Eligible: ${summary.canonicalProfileEligible}`,
+      `   Canonical Profile Blocked: ${summary.canonicalProfileBlocked}`,
+      `   Canonical Profile Blockers: ${formatActionTypeCounts(summary.canonicalProfileBlockers)}`,
+      `   Write Actions: ${summary.writeActions}`,
+      `   Env Risk Policies: ${formatActionTypeCounts(summary.envRiskPolicies)}`,
+      `   Canonical Target Policies: ${formatActionTypeCounts(summary.canonicalTargetPolicies)}`,
+      `   Scope Policies: ${formatActionTypeCounts(countMcpScopePolicies(plan.actions))}`,
+      `   Write-Ready Candidates: ${summary.writeReadyCandidates}`,
+      `   Restore-Unproven Agents: ${summary.restoreUnprovenAgentCount}`,
+      `   Low-Ownership Agents: ${summary.lowOwnershipAgentCount}`,
+      `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
+      '',
+      `   Reports written to: ${context.reportsDir}`,
+    ].join('\n');
+  }
+
+  return 'Usage: node dist/index.js mcp [plan|apply|restore]';
 }
 
 async function executeScan(context: CommandContext): Promise<string> {
@@ -353,6 +398,16 @@ function formatSyncSummaryActionTypes(actionTypes: ReturnType<typeof buildSyncPl
 function formatMcpSummaryActionTypes(actionTypes: ReturnType<typeof buildMcpGovernancePlanSummary>['actionTypes']): string {
   const entries = Object.entries(actionTypes);
   return entries.length > 0 ? entries.map(([type, count]) => `${type}=${count.actions}`).join(', ') : 'none';
+}
+
+function buildAgentConfigPaths(agents: AgentConfig[]): Record<string, string> {
+  const paths: Record<string, string> = {};
+  for (const agent of agents) {
+    if (agent.mcpConfigFile) {
+      paths[agent.name] = agent.mcpConfigFile;
+    }
+  }
+  return paths;
 }
 
 export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {

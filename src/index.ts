@@ -5,6 +5,8 @@ import { parseCliArgs } from './cli.js';
 import { applySyncPlan } from './sync/apply.js';
 import { writeSyncPlanReports } from './sync/reporter.js';
 import { writeMcpGovernancePlanReports } from './mcp/reporter.js';
+import { applyMcpPlan } from './mcp/apply.js';
+import { restoreMcpBackupManifest } from './mcp/restore.js';
 import { loadProfiles } from './profiles/loader.js';
 import { createDefaultPaths, executeCommand } from './cli/commands.js';
 import { loadSyncConfig } from './config/sync.js';
@@ -36,6 +38,8 @@ async function main() {
     writeAgentDiscoveryReports,
     applySyncPlan,
     restoreSyncBackupManifest,
+    applyMcpPlan,
+    restoreMcpBackupManifest,
   });
   console.log(output);
 }

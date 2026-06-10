@@ -96,6 +96,8 @@ test('renderHelp includes current commands', () => {
   assert.match(help, /profile list/);
   assert.match(help, /agents list/);
   assert.match(help, /mcp plan/);
+  assert.match(help, /mcp apply --confirm/);
+  assert.match(help, /mcp restore/);
   assert.match(help, /matrix/);
   assert.match(help, /health/);
 });
@@ -758,5 +760,152 @@ test('executeCommand handles sync restore through injected dependencies', async 
   assert.match(output, /Restored Entries: 1/);
   assert.match(output, /Restored Targets: 1/);
   assert.match(output, /Action Types: distribute=1/);
+  assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
+});
+
+test('executeCommand handles mcp apply --confirm', async () => {
+  const output = await executeCommand(makeCli('mcp', { subcommand: 'apply', confirm: true }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills', mcpConfigFile: 'C:/claude/.claude.json' },
+        { name: 'opencode', configDir: 'C:/opencode', skillsDir: 'C:/opencode/skills', mcpConfigFile: 'C:/opencode/opencode.json' },
+      ],
+      skills: [],
+      mcpServers: [
+        {
+          id: 'filesystem',
+          agentSources: ['claude-code', 'opencode'],
+          definitions: [
+            { agentName: 'claude-code', transport: 'stdio', command: 'npx', isEnabled: true, canStart: null, hasSensitiveEnv: false },
+            { agentName: 'opencode', transport: 'stdio', command: 'npx', isEnabled: true, canStart: null, hasSensitiveEnv: false },
+          ],
+          transport: 'stdio',
+          command: 'npx',
+          isDuplicate: true,
+          isEnabled: true,
+          canStart: null,
+          hasSensitiveEnv: false,
+        },
+      ],
+      profiles: [],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => [],
+    listAgents: async () => [],
+    discoverAgents: async () => ({ generatedAt: '2026-06-09T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
+    restoreSyncBackupManifest: async () => ({ restoredEntries: [] }),
+    applyMcpPlan: async () => ({
+      manifestPath: 'C:/backups/2026-06-09T00-00-00/manifest.json',
+      appliedActions: [
+        {
+          id: 'apply-canonical-candidate:filesystem:0',
+          type: 'add-server' as const,
+          mcpId: 'filesystem',
+          targetAgentName: 'claude-code',
+          canonicalDefinition: { transport: 'stdio' as const, command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' as const } },
+          reason: 'promote canonical MCP from governance action',
+          requiresWrite: true,
+        },
+      ],
+      backupEntries: [],
+      receipts: [
+        {
+          actionId: 'apply-canonical-candidate:filesystem:0',
+          type: 'add-server' as const,
+          mcpId: 'filesystem',
+          targetAgentName: 'claude-code',
+          targetConfigPath: 'C:/claude/.claude.json',
+          appliedAt: '2026-06-09T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  assert.match(output, /MCP apply complete!/);
+  assert.match(output, /Applied Actions: 1/);
+  assert.match(output, /Receipts: 1/);
+  assert.match(output, /Manifest: C:\/backups\//);
+});
+
+test('executeCommand mcp restore requires manifest path', async () => {
+  await assert.rejects(
+    () => executeCommand(makeCli('mcp', { subcommand: 'restore' }), {
+      reportsDir: 'C:/reports',
+      canonicalSkillsDir: 'C:/canonical',
+      backupsDir: 'C:/backups',
+      profilesDir: 'C:/profiles',
+      syncConfigPath: 'C:/config/sync.json',
+      agentConfigPath: 'C:/config/agents.json',
+      approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+      runInventory: async () => makeInventory(),
+      writeAllReports: async () => undefined,
+      writeSyncPlanReports: async () => undefined,
+      writeCapabilityMatrixReports: async () => undefined,
+      loadProfiles: async () => profiles,
+      listAgents: async () => agents,
+      discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+      writeAgentDiscoveryReports: async () => undefined,
+      applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
+      restoreSyncBackupManifest: async () => ({ restoredEntries: [] }),
+      restoreMcpBackupManifest: async () => ({ restoredEntries: [] }),
+    }),
+    { message: /Usage: node dist\/index\.js mcp restore <manifest-path>/ },
+  );
+});
+
+test('executeCommand handles mcp restore with manifest path', async () => {
+  const output = await executeCommand(makeCli('mcp', { subcommand: 'restore', profileName: 'C:/backups/manifest.json' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills', mcpConfigFile: 'C:/claude/.claude.json' },
+      ],
+      skills: [],
+      mcpServers: [],
+      profiles: [],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => [],
+    listAgents: async () => [],
+    discoverAgents: async () => ({ generatedAt: '2026-06-09T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
+    restoreSyncBackupManifest: async () => ({ restoredEntries: [] }),
+    restoreMcpBackupManifest: async () => ({
+      restoredEntries: [
+        {
+          mcpId: 'filesystem',
+          targetAgentName: 'claude-code',
+          targetConfigPath: 'C:/claude/.claude.json',
+          backupPath: 'C:/backups/backup.json',
+          backedUpAt: '2026-06-09T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  assert.match(output, /MCP restore complete!/);
+  assert.match(output, /Restored Entries: 1/);
   assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
 });
