@@ -28,6 +28,11 @@ export async function writeInventoryMarkdown(inventory: Inventory, outPath: stri
     if (agent.mcpConfigFile) lines.push(`  - MCP: \`${agent.mcpConfigFile}\``);
     if (agent.support) lines.push(`  - Support: \`${agent.support.currentLevel}\``);
     if (agent.support) lines.push(`  - Source-of-Truth Confidence: \`${agent.support.sourceOfTruthConfidence}\``);
+    if (agent.support) lines.push(`  - MCP Read: \`${agent.support.mcpReadSupport}\``);
+    if (agent.support) lines.push(`  - MCP Plan: \`${agent.support.mcpPlanSupport}\``);
+    if (agent.support) lines.push(`  - MCP Apply: \`${agent.support.mcpApplySupport}\``);
+    if (agent.support) lines.push(`  - MCP Restore: \`${agent.support.mcpRestoreSupport}\``);
+    if (agent.support) lines.push(`  - MCP Config Ownership: \`${agent.support.mcpConfigOwnershipConfidence}\``);
   }
   lines.push('');
 

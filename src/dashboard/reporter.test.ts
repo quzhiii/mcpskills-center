@@ -418,3 +418,63 @@ test('writeDashboardHtml prefers scannerType over custom id when enriching suppo
   assert.match(html, /dedicated read-only plus write-ready workflow support/);
   assert.match(html, /high/);
 });
+
+test('writeInventoryJson and writeInventoryMarkdown include MCP readiness per agent', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mcpskills-mcp-readiness-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+
+  const inventory: Inventory = {
+    generatedAt: '2026-06-09T00:00:00.000Z',
+    agents: [
+      {
+        name: 'claude-code',
+        id: 'claude-code',
+        displayName: 'Claude Code',
+        scannerType: 'claude-code',
+        enabled: true,
+        readOnly: false,
+        configDir: 'C:/claude',
+        skillsDir: 'C:/claude/skills',
+      },
+      {
+        name: 'trae',
+        id: 'trae',
+        displayName: 'Trae',
+        scannerType: 'trae',
+        enabled: false,
+        readOnly: true,
+        configDir: 'C:/trae',
+        skillsDir: 'C:/trae/skills',
+      },
+    ],
+    skills: [],
+    mcpServers: [],
+    profiles: [],
+  };
+
+  const jsonPath = join(root, 'inventory.json');
+  const markdownPath = join(root, 'inventory.md');
+
+  await writeInventoryJson(inventory, jsonPath);
+  await writeInventoryMarkdown(inventory, markdownPath);
+
+  const json = JSON.parse(await readFile(jsonPath, 'utf-8'));
+  const markdown = await readFile(markdownPath, 'utf-8');
+
+  assert.equal(json.agents[0].support.mcpApplySupport, 'write-ready');
+  assert.equal(json.agents[0].support.mcpRestoreSupport, 'write-ready');
+  assert.equal(json.agents[0].support.mcpConfigOwnershipConfidence, 'high');
+  assert.equal(json.agents[1].support.mcpApplySupport, 'observe-only');
+  assert.equal(json.agents[1].support.mcpRestoreSupport, 'unproven');
+  assert.equal(json.agents[1].support.mcpConfigOwnershipConfidence, 'low');
+
+  assert.match(markdown, /MCP Read: `native`/);
+  assert.match(markdown, /MCP Plan: `native`/);
+  assert.match(markdown, /MCP Apply: `write-ready`/);
+  assert.match(markdown, /MCP Restore: `write-ready`/);
+  assert.match(markdown, /MCP Config Ownership: `high`/);
+  assert.match(markdown, /MCP Plan: `observe-only`/);
+  assert.match(markdown, /MCP Apply: `observe-only`/);
+  assert.match(markdown, /MCP Restore: `unproven`/);
+  assert.match(markdown, /MCP Config Ownership: `low`/);
+});
