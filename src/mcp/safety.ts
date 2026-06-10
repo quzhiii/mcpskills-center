@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { describeAgentSupport } from '../agents/support.js';
 
 interface McpApplyTarget {
   targetConfigPath: string;
@@ -28,4 +29,13 @@ export function assertMcpApplyPathsWithinApprovedRoots(
 
 function normalizeRoot(root: string): string {
   return resolve(root).toLowerCase().replace(/[\\/]+$/, '');
+}
+
+export function assertMcpWriteBoundaryAllowed(agentName: string): void {
+  const support = describeAgentSupport(agentName);
+  if (support.mcpApplySupport !== 'write-ready') {
+    throw new Error(
+      `Agent "${agentName}" is not eligible for MCP writes (mcpApplySupport: ${support.mcpApplySupport})`
+    );
+  }
 }
