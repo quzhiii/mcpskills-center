@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**面向 Claude Code、OpenCode、Codex 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
+**面向 Claude Code、OpenCode、Codex、CodeBuddy、WorkBuddy、Trae、Qoder、Qoder Work 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -27,13 +27,13 @@ MCPskills Center 给一台本地机器上的多套 agent 能力提供统一的�
 产品方向是 CLI first。CLI 会继续作为治理内核，也是 scan、plan、apply、restore 的操作真相来源。后续本地 Web console 可以包裹这些产物，但不应该替代 CLI 执行模型。
 
 ```text
-Claude Code 配置 ─┐
-OpenCode 配置 ────┼─→ scan → audit → plan → verify → report
-Codex 配置 ───────┘                      │
-                                         ├─→ sync dry-run
-                                         ├─→ sync apply + backup manifest
-                                         ├─→ restore from manifest
-                                         └─→ 离线 dashboard.html
+Claude Code / OpenCode / Codex ─┐
+CodeBuddy / WorkBuddy / Trae ──┼─→ scan → audit → plan → verify → report
+Qoder / Qoder Work ────────────┘                      │
+                                                      ├─→ sync dry-run
+                                                      ├─→ sync apply + backup manifest
+                                                      ├─→ restore from manifest
+                                                      └─→ 离线 dashboard.html
 ```
 
 当前版本已经覆盖一条完整的本地工作流：
@@ -56,7 +56,7 @@ Codex 配置 ───────┘                      │
 
 当前仍然以 skills governance 作为写入能力的优先主线：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
 
-MCP governance 现在已经进入只读 / report-first 主线。当前 MCP 的下一里程碑是 scope-aware governance：把 per-definition scope 证据从 inventory 保留下来，并在真正引入 MCP 写入工作流之前，用它提升 dry-run 规划质量。
+MCP governance 已进入只读 / report-first 主线。只读 MCP kernel 已完成：scope-aware governance、canonical profile evidence、write-readiness evidence、deterministic canonical target policy 均已合并到 `master`。MCP write model design（类型、adapter 接口、安全合约）也已完成。下一个 MCP 里程碑是 `mcp-write-apply-v1`：为 write-ready 的 agent（Claude Code、OpenCode、Codex）实现 MCP config apply/restore 运行时及 per-adapter 序列化。
 
 更长期的层次是基于 CLI kernel 的本地 Web control plane，然后才是智能本地 agent routing。Web、SQLite 历史、routing 都不是当前第一优先级。
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Local-first CLI for scanning, auditing, planning, and synchronizing agent skills while inventorying MCP servers across Claude Code, OpenCode, and Codex.**
+**Local-first CLI for scanning, auditing, planning, and synchronizing agent skills while inventorying MCP servers across Claude Code, OpenCode, Codex, CodeBuddy, WorkBuddy, Trae, Qoder, and Qoder Work.**
 
 [![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -27,13 +27,13 @@ It scans installed MCP servers and skill directories, normalizes their metadata,
 The product direction is CLI-first. The CLI remains the governance kernel and operational source of truth for scan, plan, apply, and restore. A local Web console can wrap these artifacts later, but it should not replace the CLI execution model.
 
 ```text
-Claude Code config ─┐
-OpenCode config ────┼─→ scan → audit → plan → verify → report
-Codex config ───────┘                      │
-                                           ├─→ sync dry-run
-                                           ├─→ sync apply with backup manifest
-                                           ├─→ restore from manifest
-                                           └─→ offline dashboard.html
+Claude Code / OpenCode / Codex ─┐
+CodeBuddy / WorkBuddy / Trae ──┼─→ scan → audit → plan → verify → report
+Qoder / Qoder Work ────────────┘                      │
+                                                      ├─→ sync dry-run
+                                                      ├─→ sync apply with backup manifest
+                                                      ├─→ restore from manifest
+                                                      └─→ offline dashboard.html
 ```
 
 The current release focuses on a practical local workflow:
@@ -56,7 +56,7 @@ Agent support status is summarized in `docs/supported-agents.md`.
 
 Current write-capable priority remains skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
 
-MCP governance is now active on the read-only/report-first lane. The current next MCP milestone is scope-aware governance: preserve per-definition scope evidence through inventory and use it to improve MCP dry-run planning before any MCP write workflow is introduced.
+MCP governance is active on the read-only/report-first lane. The read-only MCP kernel is complete: scope-aware governance, canonical profile evidence, write-readiness evidence, and deterministic canonical target policy are all on `master`. The MCP write model design (types, adapter interface, safety contracts) is also complete. The next MCP milestone is `mcp-write-apply-v1`: runtime implementation of MCP config apply/restore with per-adapter serialization for write-ready agents (Claude Code, OpenCode, Codex).
 
 Longer-term layers are a local Web control plane over the CLI kernel, then intelligent local agent routing after governed capability state is stable. Web, SQLite history, and routing are intentionally not the first implementation priority.
 
