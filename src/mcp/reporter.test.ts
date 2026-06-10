@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderMcpGovernancePlanMarkdown, writeMcpGovernancePlanReports } from './reporter.js';
+import { buildMcpGovernancePlanSummary, renderMcpGovernancePlanMarkdown, writeMcpGovernancePlanReports } from './reporter.js';
 import type { McpGovernancePlan } from '../types/index.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -243,6 +243,100 @@ test('renderMcpGovernancePlanMarkdown includes canonical profile eligibility and
   assert.match(markdown, /\| memory \| claude-code, codex \| scope-conflict-requires-review \| scope-conflict \| MCP duplicate definitions have a scope conflict \(global, project:project-one\) and require manual review \|/);
   assert.match(markdown, /\| Type \| MCP \| Agents \| Canonical Candidate \| Env Risk Policy \| Scope Policy \| Canonical Profile Blockers \| Requires Write \| Reason \|/);
   assert.match(markdown, /\| canonical-candidate \| filesystem \| claude-code, opencode \| claude-code \| no-env-risk-detected \| no-scope-conflict-detected \| none \| no \| MCP server has equivalent duplicate definitions and is a canonical profile candidate \|/);
+});
+
+test('renderMcpGovernancePlanMarkdown includes future write readiness section', () => {
+  const plan: McpGovernancePlan = {
+    generatedAt: '2026-06-09T00:00:00.000Z',
+    actions: [
+      {
+        id: 'canonical-candidate:filesystem:0',
+        type: 'canonical-candidate',
+        mcpId: 'filesystem',
+        agentNames: ['claude-code', 'opencode'],
+        canonicalAgentName: 'claude-code',
+        canonicalProfileBlockers: [],
+        canonicalProfileCandidate: {
+          status: 'eligible',
+          profileId: 'filesystem',
+          mcpId: 'filesystem',
+          sourceAgentName: 'claude-code',
+          agentNames: ['claude-code', 'opencode'],
+          definition: {
+            transport: 'stdio',
+            command: 'npx',
+            host: undefined,
+            isEnabled: true,
+            canStart: null,
+            hasSensitiveEnv: false,
+          },
+          blockedByEnvRisk: false,
+          eligibilityReason: 'MCP server has equivalent duplicate definitions and can be represented as a canonical profile candidate',
+        },
+        envRiskPolicy: 'no-env-risk-detected',
+        scopePolicy: 'no-scope-conflict-detected',
+        definitions: [],
+        reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
+        requiresWrite: false,
+      },
+      {
+        id: 'manual-review:secrets:1',
+        type: 'manual-review',
+        mcpId: 'secrets',
+        agentNames: ['claude-code', 'trae'],
+        canonicalProfileBlockers: ['sensitive-env'],
+        envRiskPolicy: 'sensitive-env-blocks-canonicalization',
+        definitions: [],
+        reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
+        requiresWrite: false,
+      },
+    ],
+  };
+
+  const markdown = renderMcpGovernancePlanMarkdown(plan);
+
+  assert.match(markdown, /## Future Write Readiness/);
+  assert.match(markdown, /Write-ready candidates: 1/);
+  assert.match(markdown, /Restore-unproven agents: 1/);
+  assert.match(markdown, /Low-ownership agents: 1/);
+});
+
+test('buildMcpGovernancePlanSummary includes write readiness counters', () => {
+  const plan: McpGovernancePlan = {
+    generatedAt: '2026-06-09T00:00:00.000Z',
+    actions: [
+      {
+        id: 'canonical-candidate:filesystem:0',
+        type: 'canonical-candidate',
+        mcpId: 'filesystem',
+        agentNames: ['claude-code', 'opencode'],
+        canonicalAgentName: 'claude-code',
+        canonicalProfileBlockers: [],
+        envRiskPolicy: 'no-env-risk-detected',
+        scopePolicy: 'no-scope-conflict-detected',
+        definitions: [],
+        reason: 'MCP server has equivalent duplicate definitions and is a canonical profile candidate',
+        requiresWrite: false,
+      },
+      {
+        id: 'manual-review:secrets:1',
+        type: 'manual-review',
+        mcpId: 'secrets',
+        agentNames: ['claude-code', 'trae'],
+        canonicalProfileBlockers: ['sensitive-env'],
+        envRiskPolicy: 'sensitive-env-blocks-canonicalization',
+        definitions: [],
+        reason: 'MCP server has sensitive env risk and must be reviewed before canonicalization',
+        requiresWrite: false,
+      },
+    ],
+  };
+
+  const summary = buildMcpGovernancePlanSummary(plan);
+
+  assert.equal(summary.writeReadyCandidates, 1);
+  assert.equal(summary.restoreUnprovenAgentCount, 1);
+  assert.equal(summary.lowOwnershipAgentCount, 1);
 });
 
 test('writeMcpGovernancePlanReports preserves scope evidence when serializing reports', async () => {

@@ -309,6 +309,59 @@ test('executeCommand summarizes scope-aware mcp plan decisions', async () => {
   assert.deepEqual(writes, ['mcp-governance-plan']);
 });
 
+test('executeCommand mcp plan includes write readiness summary', async () => {
+  const writes: string[] = [];
+  const output = await executeCommand(makeCli('mcp', { subcommand: 'plan' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills' },
+        { name: 'opencode', configDir: 'C:/opencode', skillsDir: 'C:/opencode/skills' },
+      ],
+      skills: [],
+      mcpServers: [
+        {
+          id: 'filesystem',
+          agentSources: ['claude-code', 'opencode'],
+          definitions: [
+            { agentName: 'claude-code', transport: 'stdio', command: 'npx', isEnabled: true, canStart: null, hasSensitiveEnv: false },
+            { agentName: 'opencode', transport: 'stdio', command: 'npx', isEnabled: true, canStart: null, hasSensitiveEnv: false },
+          ],
+          transport: 'stdio',
+          command: 'npx',
+          isDuplicate: true,
+          isEnabled: true,
+          canStart: null,
+          hasSensitiveEnv: false,
+        },
+      ],
+      profiles: [],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    writeMcpGovernancePlanReports: async () => { writes.push('mcp-governance-plan'); },
+    loadProfiles: async () => [],
+    listAgents: async () => [],
+    discoverAgents: async () => ({ generatedAt: '2026-06-09T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Write-Ready Candidates:/);
+  assert.match(output, /Restore-Unproven Agents:/);
+  assert.match(output, /Low-Ownership Agents:/);
+  assert.deepEqual(writes, ['mcp-governance-plan']);
+});
+
 test('executeCommand handles matrix and writes reports', async () => {
   const writes: string[] = [];
   const output = await executeCommand(makeCli('matrix'), {

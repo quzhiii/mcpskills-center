@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { describeAgentSupport } from '../agents/support.js';
 import type { McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
 
 export interface McpGovernancePlanSummary {
@@ -10,6 +11,9 @@ export interface McpGovernancePlanSummary {
   canonicalProfileEligible: number;
   canonicalProfileBlocked: number;
   canonicalProfileBlockers: Record<string, number>;
+  writeReadyCandidates: number;
+  restoreUnprovenAgentCount: number;
+  lowOwnershipAgentCount: number;
   actionTypes: Record<string, McpGovernancePlanSummaryCount>;
   agentImpact: Record<string, McpGovernancePlanSummaryCount>;
   envRiskPolicies: Record<string, number>;
@@ -31,17 +35,29 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
     canonicalProfileEligible: 0,
     canonicalProfileBlocked: 0,
     canonicalProfileBlockers: {},
+    writeReadyCandidates: 0,
+    restoreUnprovenAgentCount: 0,
+    lowOwnershipAgentCount: 0,
     actionTypes: {},
     agentImpact: {},
     envRiskPolicies: {},
     canonicalTargetPolicies: {},
   };
 
+  const seenAgents = new Set<string>();
+
   for (const action of plan.actions) {
     incrementSummary(summary.actionTypes, action.type, action);
     if (action.type === 'canonical-candidate') summary.canonicalCandidates += 1;
     if (action.type === 'manual-review') summary.manualReviewActions += 1;
     if (action.canonicalProfileCandidate) summary.canonicalProfileEligible += 1;
+    if (action.type === 'canonical-candidate') {
+      const allWriteReady = action.agentNames.every(agentName => {
+        const support = describeAgentSupport(agentName);
+        return support.mcpApplySupport === 'write-ready' && support.mcpRestoreSupport === 'write-ready';
+      });
+      if (allWriteReady) summary.writeReadyCandidates += 1;
+    }
     if (action.canonicalProfileBlockers && action.canonicalProfileBlockers.length > 0) {
       summary.canonicalProfileBlocked += 1;
       for (const blocker of action.canonicalProfileBlockers) {
@@ -53,6 +69,12 @@ export function buildMcpGovernancePlanSummary(plan: McpGovernancePlan): McpGover
       summary.canonicalTargetPolicies[action.canonicalTargetPolicy] = (summary.canonicalTargetPolicies[action.canonicalTargetPolicy] ?? 0) + 1;
     }
     for (const agentName of action.agentNames) {
+      if (!seenAgents.has(agentName)) {
+        seenAgents.add(agentName);
+        const support = describeAgentSupport(agentName);
+        if (support.mcpRestoreSupport === 'unproven') summary.restoreUnprovenAgentCount += 1;
+        if (support.mcpConfigOwnershipConfidence === 'low') summary.lowOwnershipAgentCount += 1;
+      }
       incrementSummary(summary.agentImpact, agentName, action);
     }
   }
@@ -125,6 +147,12 @@ export function renderMcpGovernancePlanMarkdown(plan: McpGovernancePlan): string
   for (const action of plan.actions) {
     lines.push(`| ${escapeMarkdownTableCell(action.type)} | ${escapeMarkdownTableCell(action.mcpId)} | ${escapeMarkdownTableCell(action.agentNames.join(', '))} | ${escapeMarkdownTableCell(action.canonicalAgentName ?? '-')} | ${escapeMarkdownTableCell(action.envRiskPolicy)} | ${escapeMarkdownTableCell(action.scopePolicy ?? '-')} | ${escapeMarkdownTableCell(formatBlockers(action.canonicalProfileBlockers))} | ${action.requiresWrite ? 'yes' : 'no'} | ${escapeMarkdownTableCell(action.reason)} |`);
   }
+  lines.push('');
+  lines.push('## Future Write Readiness');
+  lines.push('');
+  lines.push(`Write-ready candidates: ${summary.writeReadyCandidates}`);
+  lines.push(`Restore-unproven agents: ${summary.restoreUnprovenAgentCount}`);
+  lines.push(`Low-ownership agents: ${summary.lowOwnershipAgentCount}`);
   lines.push('');
 
   return lines.join('\n');
