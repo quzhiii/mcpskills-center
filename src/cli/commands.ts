@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { copyFile } from 'node:fs/promises';
 import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
@@ -12,6 +13,10 @@ import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
 import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
+import { writeGovernanceReports } from '../governance/reporter.js';
+import { writeGovernanceConsole } from '../governance/console.js';
+import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
+import { diffGovernancePlans, formatPlanDiff } from '../governance/diff.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
@@ -58,6 +63,12 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeMatrix(context);
     case 'health':
       return executeHealth(cli, context);
+    case 'governance':
+      return executeGovernance(cli, context);
+    case 'governance-diff':
+      return executeGovernanceDiff(context);
+    case 'history':
+      return executeHistory(context);
     case 'help':
       return renderHelp();
   }
@@ -84,6 +95,11 @@ export function renderHelp(): string {
     '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
+    '  governance --dry-run          Unified skills + MCP governance plan',
+    '  governance --apply --confirm  Apply both skills sync and MCP governance',
+    '  governance --restore <path>   Restore both from manifest',
+    '  governance-diff                Compare current vs previous plans',
+    '  history                        Show governance operation history',
     '  help                         Show this help',
   ].join('\n');
 }
@@ -158,11 +174,201 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
       `   Low-Ownership Agents: ${summary.lowOwnershipAgentCount}`,
       `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
       '',
-      `   Reports written to: ${context.reportsDir}`,
-    ].join('\n');
-  }
+    `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
+  ].join('\n');
+}
 
   return 'Usage: node dist/index.js mcp [plan|apply|restore]';
+}
+
+async function executeGovernance(cli: CliArgs, context: CommandContext): Promise<string> {
+  if (cli.options.restoreManifestPath) {
+    const syncResult = await context.restoreSyncBackupManifest(cli.options.restoreManifestPath, {
+      approvedRoots: context.approvedSyncRoots,
+    });
+
+    let mcpResult: any = null;
+    if (context.restoreMcpBackupManifest) {
+      const inventory = await context.runInventory();
+      const normalized = normalizeInventory(inventory);
+      const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+      mcpResult = await context.restoreMcpBackupManifest(cli.options.restoreManifestPath, {
+        approvedRoots: Object.values(agentConfigPaths),
+      });
+    }
+
+    const lines = [
+      'Governance restore complete!',
+      '',
+      'Skills Sync:',
+      `   Restored Entries: ${syncResult.restoredEntries.length}`,
+      `   Manifest: ${cli.options.restoreManifestPath}`,
+    ];
+
+    if (mcpResult) {
+      lines.push(
+        '',
+        'MCP Governance:',
+        `   Restored Entries: ${mcpResult.restoredEntries.length}`,
+        `   Manifest: ${cli.options.restoreManifestPath}`,
+      );
+    }
+
+    await appendHistoryEntry(context.reportsDir, {
+      timestamp: new Date().toISOString(),
+      operation: 'restore',
+      domain: mcpResult ? 'unified' : 'skills',
+      actionCount: syncResult.restoredEntries.length + (mcpResult?.restoredEntries.length ?? 0),
+      manifestPath: cli.options.restoreManifestPath,
+      summary: `Restored ${syncResult.restoredEntries.length} skills${mcpResult ? ` + ${mcpResult.restoredEntries.length} MCP` : ''}`,
+    });
+
+    return lines.join('\n');
+  }
+
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const audit = runAudit(normalized);
+  const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
+
+  if (cli.options.apply) {
+    await snapshotCurrentPlansAsPrevious(context.reportsDir);
+
+    const syncPlan = planSkillSync(normalized, {
+      canonicalSkillsDir,
+      strategy: 'symlink',
+      agentNames: normalized.agents.map(agent => agent.name),
+    });
+    const syncResult = await context.applySyncPlan(syncPlan, {
+      confirm: cli.options.confirm,
+      backupsDir: context.backupsDir,
+      approvedRoots: context.approvedSyncRoots,
+    });
+
+    let mcpResult: any = null;
+    if (context.applyMcpPlan) {
+      const mcpPlan = planMcpGovernance(normalized);
+      const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+      const applyPlan = buildMcpApplyPlan(mcpPlan, Object.values(agentConfigPaths));
+      applyPlan.confirm = cli.options.confirm;
+      mcpResult = await context.applyMcpPlan(applyPlan, {
+        backupsDir: context.backupsDir,
+        agentConfigPaths,
+      });
+    }
+
+    const lines = [
+      'Governance apply complete!',
+      '',
+      'Skills:',
+      `   Applied Actions: ${syncResult.appliedActions.length}`,
+      `   Backup Entries: ${syncResult.backupEntries.length}`,
+      `   Receipts: ${syncResult.receipts.length}`,
+      `   Manifest: ${syncResult.manifestPath}`,
+    ];
+
+    if (mcpResult) {
+      lines.push(
+        '',
+        'MCP:',
+        `   Applied Actions: ${mcpResult.appliedActions.length}`,
+        `   Backup Entries: ${mcpResult.backupEntries.length}`,
+        `   Receipts: ${mcpResult.receipts.length}`,
+        `   Manifest: ${mcpResult.manifestPath}`,
+      );
+    }
+
+    await appendHistoryEntry(context.reportsDir, {
+      timestamp: new Date().toISOString(),
+      operation: 'apply',
+      domain: mcpResult ? 'unified' : 'skills',
+      actionCount: syncResult.appliedActions.length + (mcpResult?.appliedActions.length ?? 0),
+      manifestPath: syncResult.manifestPath,
+      summary: `Applied ${syncResult.appliedActions.length} skills${mcpResult ? ` + ${mcpResult.appliedActions.length} MCP` : ''}`,
+    });
+
+    return lines.join('\n');
+  }
+
+  const syncPlan = planSkillSync(normalized, {
+    canonicalSkillsDir,
+    strategy: 'symlink',
+    agentNames: normalized.agents.map(agent => agent.name),
+  });
+  await context.writeAllReports(normalized, audit, context.reportsDir);
+  await context.writeSyncPlanReports(syncPlan, context.reportsDir);
+  const syncSummary = buildSyncPlanSummary(syncPlan);
+
+  const mcpPlan = planMcpGovernance(normalized);
+  if (context.writeMcpGovernancePlanReports) {
+    await context.writeMcpGovernancePlanReports(mcpPlan, context.reportsDir, normalized.agents);
+  }
+  const mcpSummary = buildMcpGovernancePlanSummary(mcpPlan, normalized.agents);
+
+  await writeGovernanceReports({
+    generatedAt: new Date().toISOString(),
+    skills: {
+      totalSkills: normalized.skills.length,
+      syncActions: syncPlan.actions.length,
+      writeActions: syncSummary.writeActions,
+    },
+    mcp: {
+      totalServers: normalized.mcpServers.length,
+      governanceActions: mcpPlan.actions.length,
+      canonicalCandidates: mcpSummary.canonicalCandidates,
+    },
+  }, context.reportsDir);
+
+  const history = await readHistory(context.reportsDir);
+  const consolePath = await writeGovernanceConsole({
+    generatedAt: new Date().toISOString(),
+    skills: {
+      totalSkills: normalized.skills.length,
+      syncActions: syncPlan.actions.length,
+      writeActions: syncSummary.writeActions,
+      actionBreakdown: countActionTypes(syncPlan.actions),
+    },
+    mcp: {
+      totalServers: normalized.mcpServers.length,
+      governanceActions: mcpPlan.actions.length,
+      canonicalCandidates: mcpSummary.canonicalCandidates,
+      manualReview: mcpSummary.manualReviewActions,
+      actionBreakdown: countActionTypes(mcpPlan.actions),
+    },
+    history: history.entries,
+  }, context.reportsDir);
+
+  return [
+    'Governance dry-run complete!',
+    '',
+    'Skills Sync:',
+    `   Skills: ${normalized.skills.length}`,
+    `   Sync Actions: ${syncPlan.actions.length}`,
+    `   Write Actions: ${syncSummary.writeActions}`,
+    `   Action Types: ${formatSyncSummaryActionTypes(syncSummary.actionTypes)}`,
+    '',
+    'MCP Governance:',
+    `   MCP Servers: ${normalized.mcpServers.length}`,
+    `   Governance Actions: ${mcpPlan.actions.length}`,
+    `   Canonical Candidates: ${mcpSummary.canonicalCandidates}`,
+    `   Manual Review: ${mcpSummary.manualReviewActions}`,
+    `   Write Actions: ${mcpSummary.writeActions}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
+    `   Console: ${consolePath}`,
+  ].join('\n');
+}
+
+async function executeHistory(context: CommandContext): Promise<string> {
+  const history = await readHistory(context.reportsDir);
+  return formatHistory(history);
+}
+
+async function executeGovernanceDiff(context: CommandContext): Promise<string> {
+  const diff = await diffGovernancePlans(context.reportsDir);
+  return formatPlanDiff(diff);
 }
 
 async function executeScan(context: CommandContext): Promise<string> {
@@ -344,8 +550,9 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
         'Agent discovery complete!',
         `   Candidates: ${report.candidates.length}`,
         '',
-        `   Reports written to: ${context.reportsDir}`,
-      ].join('\n');
+    `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
+  ].join('\n');
     }
     default:
       return 'Usage: node dist/index.js agents [list|discover]';
@@ -408,6 +615,20 @@ function buildAgentConfigPaths(agents: AgentConfig[]): Record<string, string> {
     }
   }
   return paths;
+}
+
+export async function snapshotCurrentPlansAsPrevious(reportsDir: string): Promise<void> {
+  const pairs: [string, string][] = [
+    ['sync-plan-current.json', 'sync-plan-previous.json'],
+    ['mcp-governance-plan-current.json', 'mcp-governance-plan-previous.json'],
+  ];
+  for (const [src, dst] of pairs) {
+    try {
+      await copyFile(join(reportsDir, src), join(reportsDir, dst));
+    } catch {
+      // No previous plan to snapshot
+    }
+  }
 }
 
 export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
