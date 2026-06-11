@@ -17,6 +17,7 @@ import { writeGovernanceReports } from '../governance/reporter.js';
 import { writeGovernanceConsole } from '../governance/console.js';
 import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
 import { diffGovernancePlans, formatPlanDiff } from '../governance/diff.js';
+import { routeTask } from '../routing/router.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
@@ -71,6 +72,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeGovernanceDiff(context);
     case 'history':
       return executeHistory(context);
+    case 'route':
+      return executeRoute(cli, context);
     case 'help':
       return renderHelp();
   }
@@ -102,6 +105,7 @@ export function renderHelp(): string {
     '  governance --restore <path>   Restore both from manifest',
     '  governance-diff                Compare current vs previous plans',
     '  history                        Show governance operation history',
+    '  route <task>                 Recommend which agent to use for a task',
     '  help                         Show this help',
   ].join('\n');
 }
@@ -611,6 +615,26 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
     default:
       return 'Usage: node dist/index.js agents [list|discover]';
   }
+}
+
+async function executeRoute(cli: CliArgs, context: CommandContext): Promise<string> {
+  const taskDescription = cli.options.profileName;
+  if (!taskDescription) {
+    return 'Usage: node dist/index.js route <task-description>';
+  }
+
+  const policyPath = join(context.profilesDir, '..', 'routing-policy.json');
+  const agents = await context.listAgents();
+  const result = await routeTask(taskDescription, policyPath, agents, context.db);
+
+  return [
+    'Route Recommendation:',
+    `   Task: ${taskDescription}`,
+    `   Category: ${result.category}`,
+    `   Recommended: ${result.recommendedAgent}`,
+    `   Alternatives: ${result.alternatives.join(', ') || 'none'}`,
+    `   Reasoning: ${result.reasoning}`,
+  ].join('\n');
 }
 
 function findProfile<T extends { name: string }>(profiles: T[], name: string | undefined): T {
