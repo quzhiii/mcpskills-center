@@ -75,6 +75,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeHistory(context);
     case 'route':
       return executeRoute(cli, context);
+    case 'web':
+      return executeWeb(cli, context);
     case 'help':
       return renderHelp();
   }
@@ -116,6 +118,9 @@ export function renderHelp(): string {
     '  mcpskills health                        Passive MCP health checks',
     '  mcpskills health --active --allow-command npx',
     '  mcpskills route <task>                  Recommend agent for task',
+    '',
+    'Web Console:',
+    '  mcpskills web [--port <port>]           Start local Web console (default: 3000)',
     '',
     'Profiles:',
     '  mcpskills profile list                  List profiles',
@@ -668,6 +673,13 @@ async function executeRoute(cli: CliArgs, context: CommandContext): Promise<stri
     `   Alternatives: ${result.alternatives.join(', ') || 'none'}`,
     `   Reasoning: ${result.reasoning}`,
   ].join('\n');
+}
+
+async function executeWeb(cli: CliArgs, context: CommandContext): Promise<string> {
+  const port = Number(cli.options.profileName) || 3000;
+  const { startWebServer } = await import('../web/server.js');
+  await startWebServer(port, context);
+  return new Promise(() => {});
 }
 
 function findProfile<T extends { name: string }>(profiles: T[], name: string | undefined): T {
