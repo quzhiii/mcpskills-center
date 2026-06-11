@@ -174,8 +174,56 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
   const inventory = await context.runInventory();
   const normalized = normalizeInventory(inventory);
   const audit = runAudit(normalized);
-
   const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
+
+  if (cli.options.apply) {
+    const syncPlan = planSkillSync(normalized, {
+      canonicalSkillsDir,
+      strategy: 'symlink',
+      agentNames: normalized.agents.map(agent => agent.name),
+    });
+    const syncResult = await context.applySyncPlan(syncPlan, {
+      confirm: cli.options.confirm,
+      backupsDir: context.backupsDir,
+      approvedRoots: context.approvedSyncRoots,
+    });
+
+    let mcpResult: any = null;
+    if (context.applyMcpPlan) {
+      const mcpPlan = planMcpGovernance(normalized);
+      const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+      const applyPlan = buildMcpApplyPlan(mcpPlan, Object.values(agentConfigPaths));
+      applyPlan.confirm = cli.options.confirm;
+      mcpResult = await context.applyMcpPlan(applyPlan, {
+        backupsDir: context.backupsDir,
+        agentConfigPaths,
+      });
+    }
+
+    const lines = [
+      'Governance apply complete!',
+      '',
+      'Skills:',
+      `   Applied Actions: ${syncResult.appliedActions.length}`,
+      `   Backup Entries: ${syncResult.backupEntries.length}`,
+      `   Receipts: ${syncResult.receipts.length}`,
+      `   Manifest: ${syncResult.manifestPath}`,
+    ];
+
+    if (mcpResult) {
+      lines.push(
+        '',
+        'MCP:',
+        `   Applied Actions: ${mcpResult.appliedActions.length}`,
+        `   Backup Entries: ${mcpResult.backupEntries.length}`,
+        `   Receipts: ${mcpResult.receipts.length}`,
+        `   Manifest: ${mcpResult.manifestPath}`,
+      );
+    }
+
+    return lines.join('\n');
+  }
+
   const syncPlan = planSkillSync(normalized, {
     canonicalSkillsDir,
     strategy: 'symlink',
