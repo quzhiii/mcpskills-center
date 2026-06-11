@@ -22,49 +22,40 @@
 
 MCPskills Center gives one local machine a clear control surface for agent capabilities that are usually scattered across multiple tools.
 
-It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run skill sync plans, checks health status, and renders readable reports for review.
+It scans installed MCP servers and skill directories, normalizes their metadata, highlights duplicates and broken entries, generates dry-run plans, checks health status, and renders readable reports for review.
 
-The product direction is CLI-first. The CLI remains the governance kernel and operational source of truth for scan, plan, apply, and restore. A local Web console can wrap these artifacts later, but it should not replace the CLI execution model.
+The product direction is CLI-first. The CLI remains the governance kernel and operational source of truth for scan, plan, apply, and restore. A local Web console wraps these artifacts but does not replace the CLI execution model.
 
 ```text
 Claude Code / OpenCode / Codex ─┐
 CodeBuddy / WorkBuddy / Trae ──┼─→ scan → audit → plan → verify → report
 Qoder / Qoder Work ────────────┘                      │
-                                                      ├─→ sync dry-run
-                                                      ├─→ sync apply with backup manifest
-                                                      ├─→ restore from manifest
-                                                      └─→ offline dashboard.html
+                                                      ├─→ sync dry-run / apply / restore
+                                                      ├─→ mcp plan / apply / restore
+                                                      ├─→ governance (unified)
+                                                      ├─→ route <task>
+                                                      └─→ offline dashboard & console
 ```
-
-The current release focuses on a practical local workflow:
 
 | Capability | What it gives you |
 |---|---|
 | Inventory scanning | Unified view of MCP servers, skills, install paths, metadata, and issues |
 | Audit reporting | Duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, sensitive env key risk |
-| Sync planning | Canonical skill distribution plan with dry-run output before any writes |
-| Safe apply / restore | Explicit `--confirm`, approved-root checks, timestamped backups, restore manifests |
+| Skills sync | Canonical skill distribution plan with dry-run, apply, and restore |
+| MCP governance | MCP config planning, apply, and restore with backup manifests for write-ready agents |
+| Unified governance | `governance` command runs skills sync + MCP governance in one pass |
+| Operation history | SQLite-backed history of all apply/restore operations |
+| Plan diff | Compare current vs previous plans to see what changed |
+| Agent routing | `route <task>` recommends which agent to use based on capabilities and policy |
 | Profiles | Read-only planning for scenario-based capability bundles such as `coding` or `research` |
 | Health checks | Passive validation by default, explicit active command probing when allowlisted |
-| Dashboard | Static offline HTML report at `reports/dashboard.html` |
+| Dashboard & console | Static offline HTML reports at `reports/dashboard.html` and `reports/governance-console.html` |
 
 Agent support status is summarized in `docs/supported-agents.md`.
 
 ---
 
-## Governance Roadmap
-
-Current write-capable priority remains skills governance: make duplicate skill installs explainable, reversible, and safe to consolidate through `sync --dry-run`, `sync --apply --confirm`, and `sync --restore`.
-
-MCP governance is active on the read-only/report-first lane. The read-only MCP kernel is complete: scope-aware governance, canonical profile evidence, write-readiness evidence, and deterministic canonical target policy are all on `master`. The MCP write model design (types, adapter interface, safety contracts) is also complete. The next MCP milestone is `mcp-write-apply-v1`: runtime implementation of MCP config apply/restore with per-adapter serialization for write-ready agents (Claude Code, OpenCode, Codex).
-
-Longer-term layers are a local Web control plane over the CLI kernel, then intelligent local agent routing after governed capability state is stable. Web, SQLite history, and routing are intentionally not the first implementation priority.
-
----
-
 ## Quickstart
-
-Clone the repository, install dependencies, run the test suite, then generate the first inventory snapshot.
 
 ```bash
 git clone https://github.com/quzhiii/mcpskills-center.git
@@ -82,17 +73,25 @@ Expected result:
 - Generated reports appear under `reports/`.
 - `reports/dashboard.html` opens locally without external assets.
 
-If you want a quick read-only sync plan next:
+Next steps:
 
 ```bash
+# Skills sync plan
 node dist/index.js sync --dry-run
+
+# MCP governance plan
+node dist/index.js mcp plan
+
+# Unified governance plan (both skills + MCP)
+node dist/index.js governance --dry-run
+
+# Route a task to the best agent
+node dist/index.js route "implement a test"
 ```
 
 ---
 
 ## Outputs
-
-### Main report set
 
 `scan` writes:
 
@@ -106,24 +105,23 @@ node dist/index.js sync --dry-run
 - `reports/sync-plan-current.json`
 - `reports/sync-plan-current.md`
 
+`mcp plan` writes:
+
+- `reports/mcp-governance-plan-current.json`
+- `reports/mcp-governance-plan-current.md`
+
+`governance --dry-run` writes all of the above plus:
+
+- `reports/governance-current.json` (unified report)
+- `reports/governance-current.md` (unified report)
+- `reports/governance-console.html` (offline governance dashboard)
+
 `matrix` writes:
 
 - `reports/capability-matrix-current.json`
 - `reports/capability-matrix-current.md`
 
-`sync --apply --confirm` writes timestamped backup content under `backups/` and a consolidated manifest for the apply run.
-
-### Dashboard preview
-
-The static dashboard summarizes the current state in one offline HTML file:
-
-```text
-Summary cards     Recommendations table     Skills table     Issues table
-     │                     │                    │                │
-     └───────────── all generated from the current local inventory ─────────────┘
-```
-
-Generated HTML is a reading surface. The JSON and Markdown reports remain the auditable artifacts for automation and review.
+`sync --apply --confirm` and `mcp apply --confirm` write timestamped backup content under `backups/` and a consolidated manifest for each apply run.
 
 ---
 
@@ -133,18 +131,26 @@ Generated HTML is a reading surface. The JSON and Markdown reports remain the au
 |---|---|---|
 | `npm run scan` | Scan inventory, normalize records, audit findings, generate reports | `reports/` |
 | `npm run audit` | Print audit summary in the terminal | None |
-| `node dist/index.js sync --dry-run` | Generate a sync plan without changing agent config | `reports/` |
+| `node dist/index.js sync --dry-run` | Generate a skills sync plan without changing agent config | `reports/` |
 | `node dist/index.js sync --apply --confirm` | Apply the current sync plan with backups | `backups/` |
-| `node dist/index.js sync --restore <manifest>` | Restore a previous apply run from its manifest | Existing targets |
+| `node dist/index.js sync --restore <manifest>` | Restore a previous sync apply from its manifest | Existing targets |
+| `node dist/index.js mcp plan` | Generate MCP governance dry-run plan and reports | `reports/` |
+| `node dist/index.js mcp apply --confirm` | Apply MCP governance plan with backups | `backups/` |
+| `node dist/index.js mcp restore <manifest>` | Restore MCP config from backup manifest | Existing targets |
+| `node dist/index.js governance --dry-run` | Unified skills + MCP governance plan | `reports/` |
+| `node dist/index.js governance --apply --confirm` | Apply both skills sync and MCP governance | `backups/` |
+| `node dist/index.js governance --restore <manifest>` | Restore both from manifest | Existing targets |
+| `node dist/index.js governance-diff` | Compare current vs previous governance plans | None |
+| `node dist/index.js history` | View governance operation history | None |
+| `node dist/index.js route <task>` | Recommend which agent to use for a task | None |
 | `node dist/index.js profile list` | List available local profiles | None |
 | `node dist/index.js profile show <name>` | Print one profile JSON | None |
 | `node dist/index.js profile plan <name>` | Compare a profile against the current inventory | None |
-| `node dist/index.js agents list` | List registered local agents from `config/agents.json` | None |
-| `node dist/index.js agents discover` | Discover local agent config candidates such as Qoder, CodeBuddy, WorkBuddy, and Trae | `reports/` |
-| `node dist/index.js matrix` | Build a capability matrix across registered agents for discovered skills and MCP servers | `reports/` |
+| `node dist/index.js agents list` | List registered local agents | None |
+| `node dist/index.js agents discover` | Discover local agent config candidates | `reports/` |
+| `node dist/index.js matrix` | Build a cross-agent capability matrix | `reports/` |
 | `node dist/index.js health` | Run passive MCP health checks | None |
-| `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | Run explicit active command probes for allowlisted commands | None |
-| `node dist/index.js route <task>` | Recommend which agent to use for a task | None |
+| `node dist/index.js health --active --allow-command <cmd>` | Run active command probes | None |
 | `node dist/index.js help` | Show CLI help | None |
 
 ---
@@ -157,95 +163,90 @@ Generated HTML is a reading surface. The JSON and Markdown reports remain the au
 npm run scan
 ```
 
-Use this when you want the baseline inventory, audit report, and offline dashboard in one pass.
+Baseline inventory, audit report, and offline dashboard in one pass.
 
-### 2. Review duplicates and risky entries in the terminal
+### 2. Review duplicates and risky entries
 
 ```bash
 npm run audit
 ```
 
-Use this when you want a quick summary of duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, and sensitive env key risk.
+Quick summary of duplicate skills, duplicate MCPs, missing `SKILL.md`, symlink review items, and sensitive env key risk.
 
-### 3. Plan a canonical skill sync without writing anything
+### 3. Plan a canonical skill sync
 
 ```bash
 node dist/index.js sync --dry-run
 ```
 
-Optional custom canonical directory:
-
-```bash
-node dist/index.js sync --dry-run --canonical-dir C:\path\to\canonical-skills
-```
-
-The current planner uses a canonical store plus distribution actions to agent skill roots. Review the generated sync plan before any apply step.
-
-If you later run `sync --apply` with a custom canonical directory, add that directory to `config/sync.json` under `approvedSyncRoots` first. Apply validates both source and target paths.
-
-### 4. Apply the current sync plan with backups
+### 4. Apply skills sync with backups
 
 ```bash
 node dist/index.js sync --apply --confirm
 ```
 
-Apply mode recomputes the current plan, backs up existing targets when present, and writes one manifest that can be used for restore.
-
-### 5. Restore a previous apply run
+### 5. Restore a previous sync apply
 
 ```bash
 node dist/index.js sync --restore C:\path\to\manifest.json
 ```
 
-Restore mode copies backed-up content from the manifest back to the original target path after approved-root validation.
-
-### 6. Plan a profile for a focused workflow
+### 6. Plan MCP governance
 
 ```bash
-node dist/index.js profile plan coding
+node dist/index.js mcp plan
 ```
 
-This reports `already-present`, `missing`, and `disable` actions for the named profile without changing any live config.
+Generates MCP governance dry-run plan with scope-aware decisions, canonical profile evidence, and target policy.
 
-### 7. List registered local agents
+### 7. Apply MCP governance
 
 ```bash
-node dist/index.js agents list
+node dist/index.js mcp apply --confirm
 ```
 
-Use this to review the currently loaded registry without scanning live config. The checked-in `config/agents.json` also contains disabled read-only entries for Qoder, Qoder Work, CodeBuddy, WorkBuddy, and Trae, but disabled entries are filtered out of the runtime-loaded list.
+Applies MCP config changes to write-ready agents (Claude Code, OpenCode, Codex) with backup.
 
-### 8. Discover local agent candidates
+### 8. Unified governance (skills + MCP in one pass)
 
 ```bash
-node dist/index.js agents discover
+node dist/index.js governance --dry-run
+node dist/index.js governance --apply --confirm
+node dist/index.js governance --restore C:\path\to\manifest.json
 ```
 
-Discovery is read-only. It checks known local paths and writes `reports/agent-discovery-current.json` plus `reports/agent-discovery-current.md`.
-
-### 9. Build a cross-agent capability matrix
+### 9. Compare plans
 
 ```bash
-node dist/index.js matrix
+node dist/index.js governance-diff
 ```
 
-Use this when you want a cross-agent capability view for the current inventory. It writes `reports/capability-matrix-current.json` and `reports/capability-matrix-current.md` with per-agent presence, missing coverage, and shared-capability counts.
+Shows added, removed, and changed actions since the last apply.
 
-### 10. Run safe passive MCP health checks
+### 10. View operation history
+
+```bash
+node dist/index.js history
+```
+
+Shows all past apply/restore operations stored in SQLite.
+
+### 11. Route a task to the best agent
+
+```bash
+node dist/index.js route "fix this bug"
+node dist/index.js route "research AI agents"
+node dist/index.js route "set up a database"
+```
+
+Returns a recommended agent with reasoning based on routing policy and agent capabilities.
+
+### 12. Run health checks
 
 ```bash
 node dist/index.js health
-```
-
-Passive mode checks transport shape, command presence, URL validity, and sensitive env key risk without spawning commands.
-
-### 11. Run explicit active command probes
-
-```bash
 node dist/index.js health --active --allow-command npx --timeout 3000
 ```
-
-Active mode only probes allowlisted commands with `--version`, uses argument arrays instead of shell strings, and times out when the command does not return.
 
 ---
 
@@ -272,37 +273,21 @@ node dist/index.js profile plan coding
 
 ## Sync Approval Config
 
-Writable sync roots are controlled by `config/sync.json`.
-
-```json
-{
-  "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
-  ]
-}
-```
-
-Relative paths are resolved from the project root. Invalid values fail before an apply run begins.
+Writable sync roots are controlled by `config/sync.json`. Paths are resolved from the project root and `os.homedir()`.
 
 ---
 
 ## Safety Model
 
 - Default behavior is read-only or dry-run.
-- `sync --apply` requires explicit `--confirm`.
-- `sync --restore` requires an explicit manifest path.
+- `sync --apply`, `mcp apply`, and `governance --apply` require explicit `--confirm`.
+- Restore requires an explicit manifest path.
 - Apply and restore only operate inside approved roots.
-- Existing targets are backed up before overwrite when a previous target exists.
+- Existing targets are backed up before overwrite.
 - Generated reports never print secret values.
 - Sensitive env handling only reports key-risk presence.
 - Passive health checks do not spawn commands.
-- Active health checks require `--active`.
-- Active probes only succeed for commands explicitly allowlisted with `--allow-command`.
-- `--timeout` is optional and defaults to `3000` ms when omitted.
-- Active health probes run `spawn(command, ['--version'], { shell: false })` semantics rather than shell strings.
+- Active health checks require `--active` and `--allow-command`.
 
 ---
 
@@ -312,32 +297,35 @@ Relative paths are resolved from the project root. Invalid values fail before an
 mcpskills-center/
 ├── config/
 │   ├── profiles/
+│   ├── agents.json
+│   ├── routing-policy.json
 │   └── sync.json
+├── data/
+│   └── governance.db          (SQLite, runtime)
 ├── docs/
+│   └── plans/
 ├── fixtures/
 ├── reports/
 ├── backups/
 ├── src/
+│   ├── cli/                   (CLI commands and arg parsing)
+│   ├── db/                    (SQLite database module)
+│   ├── governance/            (unified governance, history, diff, console, reporter)
+│   ├── mcp/                   (MCP adapters, planner, reporter, apply, restore, safety)
+│   ├── routing/               (routing policy, capability index, router)
+│   ├── agents/                (agent discovery and support metadata)
+│   ├── config/                (config loaders)
+│   ├── dashboard/             (HTML dashboard generator)
+│   ├── health/                (MCP health checks)
+│   ├── matrix/                (capability matrix)
+│   ├── normalizer/            (inventory normalization)
+│   ├── profiles/              (profile loader)
+│   ├── scanner/               (inventory scanner)
+│   ├── sync/                  (skills sync planner, apply, restore)
+│   └── types/                 (shared TypeScript types)
 ├── README.md
 └── README.zh-CN.md
 ```
-
-Fixture policy:
-
-- `.claude/` is treated as local machine configuration and is not tracked as live repository payload.
-- Repository-tracked skill samples live under `fixtures/skills/`.
-- Those fixtures are synthetic and intentionally minimal.
-
----
-
-## Boundaries
-
-- The current sample `config/sync.json` is machine-oriented and may need adjustment on another system.
-- Profile matching supports short MCP ids such as `playwright` against project-scoped ids such as `C:/Users/quzhi:playwright`.
-- Passive HTTP and SSE health checks validate preserved URL or host values when present in config.
-- Active health checks validate command reachability through `--version`; they do not perform a full MCP handshake.
-- OpenCode array-form commands are normalized to the leading executable name for health probing.
-- There is no packaged binary yet; use `node dist/index.js ...` after build.
 
 ---
 
@@ -345,9 +333,9 @@ Fixture policy:
 
 | Document | Purpose |
 |---|---|
-| `docs/MCPskills-center-background-and-plan.md` | Product background, machine context, and original project framing |
-| `docs/migration-notes.md` | Migration decisions and retained / excluded assets |
-| `docs/plans/2026-06-03-mcpskills-center-completion.md` | Implementation plan for the completed CLI workflow |
+| `docs/supported-agents.md` | Agent support matrix and notes |
+| `docs/plans/` | Implementation plan documents |
+| `docs/mcp-write-model-spec.md` | MCP write model design specification |
 
 ---
 
@@ -356,16 +344,15 @@ Fixture policy:
 ```bash
 npm run build
 npm test
-npm audit --audit-level=moderate
 ```
 
-For a workflow smoke check after the test suite:
+Smoke check:
 
 ```bash
 npm run scan
-npm run audit
-node dist/index.js sync --dry-run
-node dist/index.js health
+node dist/index.js governance --dry-run
+node dist/index.js route "implement a test"
+node dist/index.js history
 ```
 
 ---

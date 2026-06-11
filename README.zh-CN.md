@@ -1,6 +1,6 @@
 # MCPskills Center
 
-<div align="center">
+<div align="center>
 
 **面向 Claude Code、OpenCode、Codex、CodeBuddy、WorkBuddy、Trae、Qoder、Qoder Work 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
 
@@ -12,7 +12,7 @@
 
 **中文** · [English](README.md)
 
-[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [支持的 Agents](docs/supported-agents.zh-CN.md) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
+[快速开始](#快速开始) · [输出物](#输出物) · [命令](#命令) · [典型场景](#典型场景) · [支持的 Agents](docs/supported-agents.md) · [Profiles](#profiles) · [安全模型](#安全模型) · [边界与限制](#边界与限制)
 
 </div>
 
@@ -22,49 +22,40 @@
 
 MCPskills Center 给一台本地机器上的多套 agent 能力提供统一的可视化和治理入口。
 
-它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run skill 同步计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
+它会扫描已安装的 MCP server 与 skills 目录，归一化元数据，标出重复项和异常项，生成 dry-run 计划，执行健康检查，并输出适合人工审阅与自动化消费的报告。
 
-产品方向是 CLI first。CLI 会继续作为治理内核，也是 scan、plan、apply、restore 的操作真相来源。后续本地 Web console 可以包裹这些产物，但不应该替代 CLI 执行模型。
+产品方向是 CLI first。CLI 会继续作为治理内核，也是 scan、plan、apply、restore 的操作真相来源。本地 Web console 可以包裹这些产物，但不应该替代 CLI 执行模型。
 
 ```text
 Claude Code / OpenCode / Codex ─┐
 CodeBuddy / WorkBuddy / Trae ──┼─→ scan → audit → plan → verify → report
 Qoder / Qoder Work ────────────┘                      │
-                                                      ├─→ sync dry-run
-                                                      ├─→ sync apply + backup manifest
-                                                      ├─→ restore from manifest
-                                                      └─→ 离线 dashboard.html
+                                                      ├─→ sync dry-run / apply / restore
+                                                      ├─→ mcp plan / apply / restore
+                                                      ├─→ governance（统一治理）
+                                                      ├─→ route <task>
+                                                      └─→ 离线 dashboard & console
 ```
-
-当前版本已经覆盖一条完整的本地工作流：
 
 | 能力 | 作用 |
 |---|---|
 | Inventory 扫描 | 统一查看 MCP server、skills、安装路径、元数据和问题项 |
 | Audit 审计 | 识别重复 skills、重复 MCP、缺失 `SKILL.md`、需要人工复核的 symlink 条目、敏感环境变量风险 |
-| Sync 规划 | 在真正写入前先生成 canonical skill 分发计划 |
-| 安全 apply / restore | 显式 `--confirm`、approved roots 校验、时间戳备份、restore manifest |
+| Skills 同步 | Canonical skill 分发计划，支持 dry-run、apply、restore |
+| MCP 治理 | MCP 配置规划、apply、restore，支持 write-ready 的 agent（Claude Code、OpenCode、Codex） |
+| 统一治理 | `governance` 命令一次执行 skills sync + MCP governance |
+| 操作历史 | SQLite 存储所有 apply/restore 操作记录 |
+| Plan 对比 | 比较当前 vs 上一次计划，查看变更 |
+| Agent 路由 | `route <task>` 根据能力和策略推荐最佳 agent |
 | Profiles | 以 `coding`、`research` 等场景包做只读规划 |
 | Health 检查 | 默认被动检查，显式 allowlist 后才做主动命令探测 |
-| Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
+| Dashboard & console | 静态离线 HTML 报告：`reports/dashboard.html` 和 `reports/governance-console.html` |
 
-各 agent 当前支持状态可见 `docs/supported-agents.zh-CN.md`。
-
----
-
-## 治理路线图
-
-当前仍然以 skills governance 作为写入能力的优先主线：让重复 skills 安装可以被解释、可回滚，并能通过 `sync --dry-run`、`sync --apply --confirm`、`sync --restore` 安全整合。
-
-MCP governance 已进入只读 / report-first 主线。只读 MCP kernel 已完成：scope-aware governance、canonical profile evidence、write-readiness evidence、deterministic canonical target policy 均已合并到 `master`。MCP write model design（类型、adapter 接口、安全合约）也已完成。下一个 MCP 里程碑是 `mcp-write-apply-v1`：为 write-ready 的 agent（Claude Code、OpenCode、Codex）实现 MCP config apply/restore 运行时及 per-adapter 序列化。
-
-更长期的层次是基于 CLI kernel 的本地 Web control plane，然后才是智能本地 agent routing。Web、SQLite 历史、routing 都不是当前第一优先级。
+各 agent 当前支持状态可见 `docs/supported-agents.md`。
 
 ---
 
 ## 快速开始
-
-克隆仓库、安装依赖、跑测试，然后生成第一份本机 inventory。
 
 ```bash
 git clone https://github.com/quzhiii/mcpskills-center.git
@@ -80,19 +71,27 @@ npm run scan
 - TypeScript 成功构建到 `dist/`
 - 测试全部通过
 - `reports/` 下生成报告
-- `reports/dashboard.html` 可以本地直接打开，无需外部静态资源
+- `reports/dashboard.html` 可以本地直接打开
 
-如果想继续看只读同步计划：
+下一步：
 
 ```bash
+# Skills 同步计划
 node dist/index.js sync --dry-run
+
+# MCP 治理计划
+node dist/index.js mcp plan
+
+# 统一治理计划（skills + MCP）
+node dist/index.js governance --dry-run
+
+# 路由任务到最佳 agent
+node dist/index.js route "implement a test"
 ```
 
 ---
 
 ## 输出物
-
-### 主要报告
 
 `scan` 会生成：
 
@@ -106,24 +105,23 @@ node dist/index.js sync --dry-run
 - `reports/sync-plan-current.json`
 - `reports/sync-plan-current.md`
 
+`mcp plan` 会生成：
+
+- `reports/mcp-governance-plan-current.json`
+- `reports/mcp-governance-plan-current.md`
+
+`governance --dry-run` 会生成以上所有，另外还有：
+
+- `reports/governance-current.json`（统一报告）
+- `reports/governance-current.md`（统一报告）
+- `reports/governance-console.html`（离线治理仪表板）
+
 `matrix` 会生成：
 
 - `reports/capability-matrix-current.json`
 - `reports/capability-matrix-current.md`
 
-`sync --apply --confirm` 会在 `backups/` 下写入带时间戳的备份目录，并生成一次 apply 对应的 consolidated manifest。
-
-### Dashboard 预览
-
-静态 dashboard 会把当前本地状态压缩成一个离线 HTML 页面：
-
-```text
-Summary cards     Recommendations table     Skills table     Issues table
-     │                     │                    │                │
-     └───────────── 全部来自当前本地 inventory 的生成结果 ─────────────┘
-```
-
-HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自动化处理的主输出。
+`sync --apply --confirm` 和 `mcp apply --confirm` 会在 `backups/` 下写入带时间戳的备份目录，并生成一份 manifest。
 
 ---
 
@@ -133,18 +131,26 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 |---|---|---|
 | `npm run scan` | 扫描 inventory、归一化记录、执行审计并生成报告 | `reports/` |
 | `npm run audit` | 在终端打印审计摘要 | 无 |
-| `node dist/index.js sync --dry-run` | 生成同步计划，不改动 agent 配置 | `reports/` |
-| `node dist/index.js sync --apply --confirm` | 应用当前同步计划并生成备份 | `backups/` |
-| `node dist/index.js sync --restore <manifest>` | 根据 manifest 恢复之前的 apply 结果 | 目标路径 |
+| `node dist/index.js sync --dry-run` | 生成 skills 同步计划 | `reports/` |
+| `node dist/index.js sync --apply --confirm` | 应用 skills 同步计划并生成备份 | `backups/` |
+| `node dist/index.js sync --restore <manifest>` | 根据 manifest 恢复之前的 sync apply | 目标路径 |
+| `node dist/index.js mcp plan` | 生成 MCP 治理 dry-run 计划 | `reports/` |
+| `node dist/index.js mcp apply --confirm` | 应用 MCP 治理计划并生成备份 | `backups/` |
+| `node dist/index.js mcp restore <manifest>` | 根据 manifest 恢复 MCP 配置 | 目标路径 |
+| `node dist/index.js governance --dry-run` | 统一 skills + MCP 治理计划 | `reports/` |
+| `node dist/index.js governance --apply --confirm` | 同时应用 skills sync 和 MCP governance | `backups/` |
+| `node dist/index.js governance --restore <manifest>` | 从 manifest 恢复两者 | 目标路径 |
+| `node dist/index.js governance-diff` | 比较当前 vs 上一次治理计划 | 无 |
+| `node dist/index.js history` | 查看治理操作历史 | 无 |
+| `node dist/index.js route <task>` | 推荐用于某任务的 agent | 无 |
 | `node dist/index.js profile list` | 列出本地 profile | 无 |
 | `node dist/index.js profile show <name>` | 打印一个 profile 的 JSON | 无 |
 | `node dist/index.js profile plan <name>` | 将 profile 与当前 inventory 对比 | 无 |
-| `node dist/index.js agents list` | 列出 `config/agents.json` 中注册的本地 agents | 无 |
-| `node dist/index.js agents discover` | 发现 Qoder、CodeBuddy、WorkBuddy、Trae 等本地 agent 配置候选路径 | `reports/` |
-| `node dist/index.js matrix` | 为已注册 agents 上发现的 skills 和 MCP servers 生成能力矩阵 | `reports/` |
+| `node dist/index.js agents list` | 列出注册的本地 agents | 无 |
+| `node dist/index.js agents discover` | 发现本地 agent 配置候选路径 | `reports/` |
+| `node dist/index.js matrix` | 生成跨 agent 能力矩阵 | `reports/` |
 | `node dist/index.js health` | 执行被动 MCP 健康检查 | 无 |
-| `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | 对 allowlist 中的命令做显式主动探测 | 无 |
-| `node dist/index.js route <task>` | 推荐用于某任务的 agent | 无 |
+| `node dist/index.js health --active --allow-command <cmd>` | 对 allowlist 命令做主动探测 | 无 |
 | `node dist/index.js help` | 查看 CLI 帮助 | 无 |
 
 ---
@@ -157,31 +163,17 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 npm run scan
 ```
 
-适合一次性拿到 inventory、audit 和离线 dashboard。
-
 ### 2. 在终端里快速看重复项和风险项
 
 ```bash
 npm run audit
 ```
 
-这个命令会汇总重复 skills、重复 MCP、缺失 `SKILL.md`、需要人工复核的 symlink 条目、敏感环境变量 key 风险。
-
-### 3. 先看 canonical skill 同步计划，再决定是否写入
+### 3. 先看 canonical skill 同步计划
 
 ```bash
 node dist/index.js sync --dry-run
 ```
-
-可选自定义 canonical 目录：
-
-```bash
-node dist/index.js sync --dry-run --canonical-dir C:\path\to\canonical-skills
-```
-
-当前 planner 会围绕 canonical store 和各 agent skill root 的分发动作生成计划。建议先审阅计划输出，再决定是否 apply。
-
-如果后续要用自定义 canonical 目录执行 `sync --apply`，需要先把该目录加入 `config/sync.json` 的 `approvedSyncRoots`。apply 会同时校验 source path 和 target path。
 
 ### 4. 显式确认后再应用同步计划
 
@@ -189,63 +181,66 @@ node dist/index.js sync --dry-run --canonical-dir C:\path\to\canonical-skills
 node dist/index.js sync --apply --confirm
 ```
 
-apply 模式会重新计算当前计划，必要时先备份已有 target，然后写出一份后续可 restore 的 manifest。
-
 ### 5. 用 manifest 回滚之前的一次 apply
 
 ```bash
 node dist/index.js sync --restore C:\path\to\manifest.json
 ```
 
-restore 模式会先做 approved roots 校验，再把备份内容复制回原目标路径。
-
-### 6. 针对具体工作场景做 profile 规划
+### 6. 生成 MCP 治理计划
 
 ```bash
-node dist/index.js profile plan coding
+node dist/index.js mcp plan
 ```
 
-输出会按 `already-present`、`missing`、`disable` 三类展示，不会修改 live config。
+生成 MCP 治理 dry-run 计划，包含 scope-aware 决策、canonical profile evidence、target policy。
 
-### 7. 查看已注册的本地 agents
+### 7. 应用 MCP 治理计划
 
 ```bash
-node dist/index.js agents list
+node dist/index.js mcp apply --confirm
 ```
 
-这个命令只读取当前加载后的 registry，不扫描 live config。仓库里的 `config/agents.json` 还包含 Qoder、Qoder Work、CodeBuddy、WorkBuddy、Trae 的 disabled/read-only 占位配置，但 disabled 条目不会出现在运行时加载后的列表里。
-
-### 8. 发现本地 agent 候选配置路径
+### 8. 统一治理（skills + MCP 一次执行）
 
 ```bash
-node dist/index.js agents discover
+node dist/index.js governance --dry-run
+node dist/index.js governance --apply --confirm
+node dist/index.js governance --restore C:\path\to\manifest.json
 ```
 
-Discovery 是只读操作。它会检查常见本地路径，并写出 `reports/agent-discovery-current.json` 与 `reports/agent-discovery-current.md`。
-
-### 9. 查看当前 inventory 的跨 agent 能力矩阵
+### 9. 比较计划变更
 
 ```bash
-node dist/index.js matrix
+node dist/index.js governance-diff
 ```
 
-适合在当前 inventory 之上快速看到哪些 skill 和 MCP 能力分布在多个 agent 上、哪些 agent 缺失对应能力，以及共享能力数量。它会写出 `reports/capability-matrix-current.json` 与 `reports/capability-matrix-current.md`。
+显示自上次 apply 以来新增、移除、变更的 actions。
 
-### 10. 先做安全的被动 MCP 健康检查
+### 10. 查看操作历史
+
+```bash
+node dist/index.js history
+```
+
+显示 SQLite 中存储的所有 apply/restore 操作记录。
+
+### 11. 路由任务到最佳 agent
+
+```bash
+node dist/index.js route "fix this bug"
+node dist/index.js route "research AI agents"
+node dist/index.js route "set up a database"
+```
+
+根据路由策略和 agent 能力返回推荐 agent 及理由。
+
+### 12. 健康检查
 
 ```bash
 node dist/index.js health
-```
-
-被动模式不会启动命令，只检查 transport 形态、command 是否存在、URL 是否有效、敏感 env key 风险等。
-
-### 11. 对 allowlist 命令做显式主动探测
-
-```bash
 node dist/index.js health --active --allow-command npx --timeout 3000
 ```
-
-主动模式只会对 allowlist 中的命令执行 `--version` 探测，使用参数数组而不是 shell 字符串，并带超时限制。
 
 ---
 
@@ -272,37 +267,21 @@ node dist/index.js profile plan coding
 
 ## Sync Approval Config
 
-可写的同步根目录由 `config/sync.json` 控制。
-
-```json
-{
-  "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
-  ]
-}
-```
-
-相对路径会按项目根目录解析。配置值非法时，apply 开始前就会失败。
+可写的同步根目录由 `config/sync.json` 控制。路径按项目根目录和 `os.homedir()` 解析。
 
 ---
 
 ## 安全模型
 
 - 默认行为是 read-only 或 dry-run。
-- `sync --apply` 必须显式带 `--confirm`。
-- `sync --restore` 必须提供 manifest 路径。
-- apply 与 restore 只会在 approved roots 内操作。
+- `sync --apply`、`mcp apply`、`governance --apply` 必须显式带 `--confirm`。
+- Restore 必须提供 manifest 路径。
+- Apply 与 restore 只会在 approved roots 内操作。
 - 有旧 target 时会先备份再覆盖。
 - 生成报告不会打印 secret value。
 - 对敏感环境变量只报告 key 风险，不展示值。
 - 被动 health check 不会启动命令。
-- 主动 health check 需要显式带 `--active`。
-- 主动探测只有在命令通过 `--allow-command` 加入 allowlist 后才会成功。
-- `--timeout` 是可选参数；省略时默认使用 `3000` ms。
-- 主动探测采用 `spawn(command, ['--version'], { shell: false })` 语义，而不是 shell 字符串。
+- 主动 health check 需要 `--active` 和 `--allow-command`。
 
 ---
 
@@ -312,32 +291,35 @@ node dist/index.js profile plan coding
 mcpskills-center/
 ├── config/
 │   ├── profiles/
+│   ├── agents.json
+│   ├── routing-policy.json
 │   └── sync.json
+├── data/
+│   └── governance.db          (SQLite, 运行时生成)
 ├── docs/
+│   └── plans/
 ├── fixtures/
 ├── reports/
 ├── backups/
 ├── src/
+│   ├── cli/                   (CLI 命令和参数解析)
+│   ├── db/                    (SQLite 数据库模块)
+│   ├── governance/            (统一治理、历史、diff、console、reporter)
+│   ├── mcp/                   (MCP adapters、planner、reporter、apply、restore、safety)
+│   ├── routing/               (路由策略、能力索引、路由器)
+│   ├── agents/                (agent 发现和支持元数据)
+│   ├── config/                (配置加载器)
+│   ├── dashboard/             (HTML dashboard 生成器)
+│   ├── health/                (MCP 健康检查)
+│   ├── matrix/                (能力矩阵)
+│   ├── normalizer/            (inventory 归一化)
+│   ├── profiles/              (profile 加载器)
+│   ├── scanner/               (inventory 扫描器)
+│   ├── sync/                  (skills sync planner、apply、restore)
+│   └── types/                 (共享 TypeScript 类型)
 ├── README.md
 └── README.zh-CN.md
 ```
-
-Fixture 策略：
-
-- `.claude/` 被视为本地机器配置，不作为 live repository payload 跟踪。
-- 仓库内可跟踪的 skill 样例放在 `fixtures/skills/`。
-- 这些 fixtures 是 synthetic 且保持最小化。
-
----
-
-## 边界与限制
-
-- 当前示例 `config/sync.json` 偏向单机使用，换机器后通常需要调整。
-- Profile 匹配支持把 `playwright` 这类 short MCP id 匹配到 `C:/Users/quzhi:playwright` 这类 project-scoped id。
-- 被动 HTTP / SSE 健康检查会校验配置里保留下来的 URL 或 host 值。
-- 主动健康检查验证的是 `--version` 级别的命令可达性，不是完整 MCP handshake。
-- OpenCode 的 array-form command 当前会归一化为前导可执行文件名用于 health probing。
-- 目前还没有 packaged binary，构建后通过 `node dist/index.js ...` 使用。
 
 ---
 
@@ -345,9 +327,9 @@ Fixture 策略：
 
 | 文档 | 作用 |
 |---|---|
-| `docs/MCPskills-center-background-and-plan.md` | 产品背景、本机上下文与最初项目定位 |
-| `docs/migration-notes.md` | 迁移决策、保留内容与排除内容 |
-| `docs/plans/2026-06-03-mcpskills-center-completion.md` | 当前 CLI 工作流的实施计划 |
+| `docs/supported-agents.md` | Agent 支持矩阵和说明 |
+| `docs/plans/` | 实施计划文档 |
+| `docs/mcp-write-model-spec.md` | MCP write model 设计规格 |
 
 ---
 
@@ -356,16 +338,15 @@ Fixture 策略：
 ```bash
 npm run build
 npm test
-npm audit --audit-level=moderate
 ```
 
-如果要补一轮工作流 smoke check：
+Smoke check：
 
 ```bash
 npm run scan
-npm run audit
-node dist/index.js sync --dry-run
-node dist/index.js health
+node dist/index.js governance --dry-run
+node dist/index.js route "implement a test"
+node dist/index.js history
 ```
 
 ---
