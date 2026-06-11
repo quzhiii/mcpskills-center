@@ -27,6 +27,15 @@ export interface ActionResultRow {
   status: string;
 }
 
+export interface RoutingLogRow {
+  timestamp: string;
+  taskDescription: string;
+  recommendedAgent: string;
+  category: string;
+  alternatives?: string;
+  reasoning: string;
+}
+
 export function openGovernanceDb(dbPath: string): Database.Database {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
@@ -73,6 +82,20 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_snapshots_captured ON inventory_snapshots(captured_at);
     CREATE INDEX IF NOT EXISTS idx_results_run ON action_results(run_timestamp);
     CREATE INDEX IF NOT EXISTS idx_results_domain ON action_results(domain);
+
+    CREATE TABLE IF NOT EXISTS routing_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      task_description TEXT NOT NULL,
+      recommended_agent TEXT NOT NULL,
+      category TEXT NOT NULL,
+      alternatives TEXT,
+      reasoning TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_routing_timestamp ON routing_log(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_routing_agent ON routing_log(recommended_agent);
   `);
 }
 
@@ -137,4 +160,23 @@ export function readActionResults(db: Database.Database, domain?: string, limit 
     ORDER BY id DESC
     LIMIT ?
   `).all(limit) as ActionResultRow[];
+}
+
+// --- Routing Log ---
+
+export function insertRoutingLog(db: Database.Database, entry: RoutingLogRow): void {
+  db.prepare(`
+    INSERT INTO routing_log (timestamp, task_description, recommended_agent, category, alternatives, reasoning)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(entry.timestamp, entry.taskDescription, entry.recommendedAgent, entry.category, entry.alternatives ?? null, entry.reasoning);
+}
+
+export function readRoutingLog(db: Database.Database, limit = 20): RoutingLogRow[] {
+  return db.prepare(`
+    SELECT timestamp, task_description as taskDescription, recommended_agent as recommendedAgent,
+           category, alternatives, reasoning
+    FROM routing_log
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(limit) as RoutingLogRow[];
 }

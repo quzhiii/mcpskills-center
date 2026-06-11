@@ -625,7 +625,7 @@ async function executeRoute(cli: CliArgs, context: CommandContext): Promise<stri
 
   const policyPath = join(context.profilesDir, '..', 'routing-policy.json');
   const agents = await context.listAgents();
-  const result = await routeTask(taskDescription, policyPath, agents);
+  const result = await routeTask(taskDescription, policyPath, agents, context.db);
 
   return [
     'Route Recommendation:',

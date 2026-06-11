@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openGovernanceDb, insertGovernanceHistory, readGovernanceHistory, insertInventorySnapshot, readInventorySnapshots, insertActionResult, readActionResults } from './index.js';
+import { openGovernanceDb, insertGovernanceHistory, readGovernanceHistory, insertInventorySnapshot, readInventorySnapshots, insertActionResult, readActionResults, insertRoutingLog, readRoutingLog } from './index.js';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -115,5 +115,51 @@ test('readActionResults filters by domain', () => {
   const skillsResults = readActionResults(db, 'skills');
   assert.equal(skillsResults.length, 1);
   assert.equal(skillsResults[0].domain, 'skills');
+  db.close();
+});
+
+test('openGovernanceDb creates routing_log table', () => {
+  const tmpDir = makeTempDir();
+  const db = openGovernanceDb(join(tmpDir, 'test.db'));
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
+  const tableNames = tables.map((t: any) => t.name);
+  assert.ok(tableNames.includes('routing_log'));
+  db.close();
+});
+
+test('insertRoutingLog and readRoutingLog round-trip', () => {
+  const tmpDir = makeTempDir();
+  const db = openGovernanceDb(join(tmpDir, 'test.db'));
+  insertRoutingLog(db, {
+    timestamp: '2026-06-11T00:00:00Z',
+    taskDescription: 'fix this bug',
+    recommendedAgent: 'claude-code',
+    category: 'coding',
+    alternatives: 'opencode, codex',
+    reasoning: 'Task matches category "coding".',
+  });
+  const entries = readRoutingLog(db);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].recommendedAgent, 'claude-code');
+  assert.equal(entries[0].taskDescription, 'fix this bug');
+  assert.equal(entries[0].category, 'coding');
+  assert.equal(entries[0].alternatives, 'opencode, codex');
+  db.close();
+});
+
+test('readRoutingLog respects limit', () => {
+  const tmpDir = makeTempDir();
+  const db = openGovernanceDb(join(tmpDir, 'test.db'));
+  for (let i = 0; i < 5; i++) {
+    insertRoutingLog(db, {
+      timestamp: `2026-06-11T${String(i).padStart(2, '0')}:00:00Z`,
+      taskDescription: `task ${i}`,
+      recommendedAgent: 'agent',
+      category: 'cat',
+      reasoning: `reason ${i}`,
+    });
+  }
+  const entries = readRoutingLog(db, 3);
+  assert.equal(entries.length, 3);
   db.close();
 });
