@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { escapeMarkdownTableCell } from '../reporting/format.js';
 import type { SyncAction, SyncPlan } from '../types/index.js';
 
 export interface SyncPlanSummary {
@@ -117,8 +118,4 @@ function formatActionTypeCounts(counts: Record<string, number>): string {
 
 function formatPath(value: string | undefined): string {
   return value ? `\`${escapeMarkdownTableCell(value)}\`` : '-';
-}
-
-function escapeMarkdownTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }

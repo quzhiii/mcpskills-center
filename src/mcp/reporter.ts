@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { resolveAgentSupport } from '../agents/support.js';
+import { escapeMarkdownTableCell } from '../reporting/format.js';
 import type { AgentConfig, McpGovernanceAction, McpGovernancePlan } from '../types/index.js';
 
 export interface McpGovernancePlanSummary {
@@ -208,8 +209,4 @@ function formatScope(scope: { kind: string; id?: string } | undefined): string {
 
 function formatBlockers(blockers: string[] | undefined): string {
   return blockers && blockers.length > 0 ? blockers.join(', ') : 'none';
-}
-
-function escapeMarkdownTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
