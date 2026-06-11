@@ -144,6 +144,7 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 | `node dist/index.js matrix` | 为已注册 agents 上发现的 skills 和 MCP servers 生成能力矩阵 | `reports/` |
 | `node dist/index.js health` | 执行被动 MCP 健康检查 | 无 |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | 对 allowlist 中的命令做显式主动探测 | 无 |
+| `node dist/index.js route <task>` | 推荐用于某任务的 agent | 无 |
 | `node dist/index.js help` | 查看 CLI 帮助 | 无 |
 
 ---

@@ -144,6 +144,7 @@ Generated HTML is a reading surface. The JSON and Markdown reports remain the au
 | `node dist/index.js matrix` | Build a capability matrix across registered agents for discovered skills and MCP servers | `reports/` |
 | `node dist/index.js health` | Run passive MCP health checks | None |
 | `node dist/index.js health --active --allow-command <cmd> [--timeout <ms>]` | Run explicit active command probes for allowlisted commands | None |
+| `node dist/index.js route <task>` | Recommend which agent to use for a task | None |
 | `node dist/index.js help` | Show CLI help | None |
 
 ---

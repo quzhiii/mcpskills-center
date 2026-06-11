@@ -8,6 +8,14 @@ export interface PlanDiffResult {
   unchanged: string[];
 }
 
+interface ActionFields {
+  id: string;
+  type: string;
+  reason?: string;
+  canonicalAgentName?: string;
+  envRiskPolicy?: string;
+}
+
 export async function diffGovernancePlans(
   reportsDir: string,
 ): Promise<PlanDiffResult> {
@@ -16,18 +24,32 @@ export async function diffGovernancePlans(
   const prevSync = await readPlanJson(join(reportsDir, 'sync-plan-previous.json'));
   const prevMcp = await readPlanJson(join(reportsDir, 'mcp-governance-plan-previous.json'));
 
-  const currentActions = extractActionIds(currentSync).concat(extractActionIds(currentMcp));
-  const prevActions = extractActionIds(prevSync).concat(extractActionIds(prevMcp));
+  const currentActions = extractActions(currentSync).concat(extractActions(currentMcp));
+  const prevActions = extractActions(prevSync).concat(extractActions(prevMcp));
 
-  const currentSet = new Set(currentActions);
-  const prevSet = new Set(prevActions);
+  const currentMap = new Map(currentActions.map(a => [a.id, a]));
+  const prevMap = new Map(prevActions.map(a => [a.id, a]));
 
-  return {
-    added: currentActions.filter(a => !prevSet.has(a)),
-    removed: prevActions.filter(a => !currentSet.has(a)),
-    changed: [],
-    unchanged: currentActions.filter(a => prevSet.has(a)),
-  };
+  const added = currentActions.filter(a => !prevMap.has(a.id)).map(a => a.id);
+  const removed = prevActions.filter(a => !currentMap.has(a.id)).map(a => a.id);
+  const changed: string[] = [];
+  const unchanged: string[] = [];
+
+  for (const [id, current] of currentMap) {
+    const prev = prevMap.get(id);
+    if (!prev) continue;
+    if (
+      current.type !== prev.type ||
+      current.reason !== prev.reason ||
+      current.canonicalAgentName !== prev.canonicalAgentName
+    ) {
+      changed.push(id);
+    } else {
+      unchanged.push(id);
+    }
+  }
+
+  return { added, removed, changed, unchanged };
 }
 
 export function formatPlanDiff(diff: PlanDiffResult): string {
@@ -51,7 +73,7 @@ export function formatPlanDiff(diff: PlanDiffResult): string {
   return lines.join('\n');
 }
 
-async function readPlanJson(path: string): Promise<any> {
+async function readPlanJson(path: string): Promise<Record<string, unknown> | null> {
   try {
     return JSON.parse(await readFile(path, 'utf-8'));
   } catch {
@@ -59,7 +81,13 @@ async function readPlanJson(path: string): Promise<any> {
   }
 }
 
-function extractActionIds(plan: any): string[] {
+function extractActions(plan: Record<string, unknown> | null): ActionFields[] {
   if (!plan || !plan.actions) return [];
-  return plan.actions.map((a: any) => a.id);
+  return (plan.actions as Array<Record<string, unknown>>).map(a => ({
+    id: a.id as string,
+    type: a.type as string,
+    reason: a.reason as string | undefined,
+    canonicalAgentName: a.canonicalAgentName as string | undefined,
+    envRiskPolicy: a.envRiskPolicy as string | undefined,
+  }));
 }

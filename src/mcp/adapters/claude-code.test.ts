@@ -103,3 +103,31 @@ test('serializeClaudeCodeMcpConfig handles no existing content', () => {
   const parsed = JSON.parse(result);
   assert.ok(parsed.mcpServers.fs);
 });
+
+test('serializeClaudeCodeMcpConfig preserves global env data', () => {
+  const existing = JSON.stringify({
+    mcpServers: {
+      fetcher: { command: 'npx', env: { API_KEY: 'secret' } },
+    },
+  });
+  const servers = parseClaudeCodeMcpConfig(existing);
+  const result = serializeClaudeCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.deepEqual(parsed.mcpServers.fetcher.env, { API_KEY: 'secret' });
+});
+
+test('serializeClaudeCodeMcpConfig preserves project env data', () => {
+  const existing = JSON.stringify({
+    projects: {
+      myproject: {
+        mcpServers: {
+          reader: { url: 'https://example.com/sse', env: { TOKEN: 'abc' } },
+        },
+      },
+    },
+  });
+  const servers = parseClaudeCodeMcpConfig(existing);
+  const result = serializeClaudeCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.deepEqual(parsed.projects.myproject.mcpServers.reader.env, { TOKEN: 'abc' });
+});

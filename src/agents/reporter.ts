@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { escapeMarkdownTableCell } from '../reporting/format.js';
 import type { AgentDiscoveryReport } from '../types/index.js';
 
 export async function writeAgentDiscoveryReports(report: AgentDiscoveryReport, reportsDir: string): Promise<void> {
@@ -27,8 +28,4 @@ export function renderAgentDiscoveryMarkdown(report: AgentDiscoveryReport): stri
 
   lines.push('');
   return lines.join('\n');
-}
-
-function escapeMarkdownTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }

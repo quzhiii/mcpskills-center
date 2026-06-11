@@ -2,6 +2,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { renderDashboardHtml } from './html.js';
 import { resolveAgentSupport } from '../agents/support.js';
+import { escapeMarkdownTableCell } from '../reporting/format.js';
 import type { Inventory, AuditReport } from '../types/index.js';
 
 export async function writeInventoryJson(inventory: Inventory, outPath: string): Promise<void> {
@@ -159,10 +160,6 @@ export async function writeAuditMarkdown(report: AuditReport, outPath: string): 
 
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, lines.join('\n'), 'utf-8');
-}
-
-function escapeMarkdownTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
 function formatValue(value: string | undefined): string {

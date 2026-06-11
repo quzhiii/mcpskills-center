@@ -1,5 +1,6 @@
 import { parseJsonConfig } from '../../config/parse.js';
 import type { McpConfigAdapter, ParsedMcpConfigServer } from './base.js';
+import { asRecord, detectTransport, extractCommand, checkSensitiveEnv } from './shared.js';
 
 export const parseOpenCodeMcpConfig: McpConfigAdapter['parse'] = (content: string) => {
   const config = parseJsonConfig<Record<string, unknown>>(content);
@@ -19,48 +20,16 @@ export const parseOpenCodeMcpConfig: McpConfigAdapter['parse'] = (content: strin
   });
 };
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
-
-function detectTransport(cfg: Record<string, unknown>): ParsedMcpConfigServer['transport'] {
-  if (extractCommand(cfg)) return 'stdio';
-  if (typeof cfg.url === 'string') {
-    return cfg.url.includes('/sse') ? 'sse' : 'http';
-  }
-  return 'unknown';
-}
-
-function extractCommand(cfg: Record<string, unknown>): string | undefined {
-  if (typeof cfg.command === 'string') {
-    return cfg.command;
-  }
-
-  if (Array.isArray(cfg.command) && typeof cfg.command[0] === 'string') {
-    return cfg.command[0];
-  }
-
-  return undefined;
-}
-
-function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
-  const env = {
-    ...asRecord(cfg.env),
-    ...asRecord(cfg.environment),
-  };
-  const sensitiveKeys = ['api_key', 'apikey', 'token', 'secret', 'password', 'auth'];
-  return Object.keys(env).some(key => sensitiveKeys.some(s => key.toLowerCase().includes(s)));
-}
-
 export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (servers: ParsedMcpConfigServer[], existingContent?: string): string => {
   const existing: Record<string, unknown> = existingContent
     ? JSON.parse(existingContent)
     : {};
 
+  const existingMcp = asRecord(existing.mcp);
+
   const mcp: Record<string, unknown> = {};
   for (const server of servers) {
+    const existingServer = asRecord(existingMcp[server.id]);
     const entry: Record<string, unknown> = {};
     if (server.command) {
       entry.command = server.command;
@@ -69,6 +38,8 @@ export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (server
       entry.url = server.host;
     }
     entry.enabled = server.isEnabled;
+    if (existingServer.env) entry.env = existingServer.env;
+    if (existingServer.environment) entry.environment = existingServer.environment;
     mcp[server.id] = entry;
   }
 

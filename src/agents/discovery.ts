@@ -1,6 +1,6 @@
-import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { pathExists } from '../fs-utils.js';
 import { describeAgentSupport } from './support.js';
 import type { AgentDiscoveryCandidate, AgentDiscoveryReport, AgentDiscoverySpec } from '../types/index.js';
 
@@ -156,13 +156,4 @@ async function findConfirmFile(root: string, confirmFiles: string[]): Promise<st
   }
 
   return null;
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }

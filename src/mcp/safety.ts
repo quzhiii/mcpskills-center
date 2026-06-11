@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { normalizeRoot } from '../fs-utils.js';
 import { describeAgentSupport } from '../agents/support.js';
 
 interface McpApplyTarget {
@@ -25,10 +26,6 @@ export function assertMcpApplyPathsWithinApprovedRoots(
       );
     }
   }
-}
-
-function normalizeRoot(root: string): string {
-  return resolve(root).toLowerCase().replace(/[\\/]+$/, '');
 }
 
 export function assertMcpWriteBoundaryAllowed(agentName: string): void {

@@ -60,3 +60,40 @@ test('formatPlanDiff shows added and removed', () => {
   assert.ok(result.includes('+ a1'));
   assert.ok(result.includes('- a2'));
 });
+
+test('diffGovernancePlans detects changed actions', async () => {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'diff-test-'));
+  await writeFile(join(tmpDir, 'sync-plan-current.json'), JSON.stringify({
+    actions: [{ id: 'a1', type: 'skip', reason: 'single agent' }],
+  }), 'utf-8');
+  await writeFile(join(tmpDir, 'sync-plan-previous.json'), JSON.stringify({
+    actions: [{ id: 'a1', type: 'manual-review', reason: 'conflict' }],
+  }), 'utf-8');
+  const diff = await diffGovernancePlans(tmpDir);
+  assert.equal(diff.changed.length, 1);
+  assert.equal(diff.changed[0], 'a1');
+});
+
+test('diffGovernancePlans treats same fields as unchanged', async () => {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'diff-test-'));
+  await writeFile(join(tmpDir, 'sync-plan-current.json'), JSON.stringify({
+    actions: [{ id: 'a1', type: 'skip', reason: 'ok' }],
+  }), 'utf-8');
+  await writeFile(join(tmpDir, 'sync-plan-previous.json'), JSON.stringify({
+    actions: [{ id: 'a1', type: 'skip', reason: 'ok' }],
+  }), 'utf-8');
+  const diff = await diffGovernancePlans(tmpDir);
+  assert.deepEqual(diff.changed, []);
+  assert.deepEqual(diff.unchanged, ['a1']);
+});
+
+test('formatPlanDiff shows changed entries', () => {
+  const result = formatPlanDiff({
+    added: [],
+    removed: [],
+    changed: ['a1'],
+    unchanged: [],
+  });
+  assert.ok(result.includes('~ a1'));
+  assert.ok(result.includes('Changed (1)'));
+});

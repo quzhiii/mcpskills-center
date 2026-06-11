@@ -100,3 +100,27 @@ test('serializeOpenCodeMcpConfig handles no existing content', () => {
   const parsed = JSON.parse(result);
   assert.ok(parsed.mcp.fs);
 });
+
+test('serializeOpenCodeMcpConfig preserves env data', () => {
+  const existing = JSON.stringify({
+    mcp: {
+      fs: { command: 'npx', enabled: true, env: { API_KEY: 'secret' } },
+    },
+  });
+  const servers = parseOpenCodeMcpConfig(existing);
+  const result = serializeOpenCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.deepEqual(parsed.mcp.fs.env, { API_KEY: 'secret' });
+});
+
+test('serializeOpenCodeMcpConfig preserves environment data', () => {
+  const existing = JSON.stringify({
+    mcp: {
+      fs: { command: 'npx', enabled: true, environment: { TOKEN: 'abc' } },
+    },
+  });
+  const servers = parseOpenCodeMcpConfig(existing);
+  const result = serializeOpenCodeMcpConfig(servers, existing);
+  const parsed = JSON.parse(result);
+  assert.deepEqual(parsed.mcp.fs.environment, { TOKEN: 'abc' });
+});

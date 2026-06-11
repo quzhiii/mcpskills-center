@@ -1,6 +1,7 @@
-import { cp, mkdir, rm, stat, symlink } from 'node:fs/promises';
+import { cp, mkdir, rm, symlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createBackupEntry, writeBackupManifest } from './backup.js';
+import { normalizeRoot, pathExists } from '../fs-utils.js';
 import type { SyncAction, SyncBackupEntry, SyncPlan } from '../types/index.js';
 
 export interface ApplySyncPlanOptions {
@@ -157,19 +158,6 @@ function assertActionPathsWithinApprovedRoots(action: SyncAction, approvedRoots:
   }
 }
 
-function normalizeRoot(root: string): string {
-  return resolve(root).toLowerCase().replace(/[\\/]+$/, '');
-}
-
 function isWriteAction(type: SyncAction['type']): boolean {
   return type === 'promote-canonical' || type === 'distribute';
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
