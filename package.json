@@ -1,9 +1,27 @@
 {
   "name": "mcpskills-center",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Unified MCP and skills management, audit, sync, and visualization platform for Claude Code, OpenCode, and Codex",
   "main": "dist/index.js",
+  "bin": {
+    "mcpskills": "dist/bin.js",
+    "mcpskills-center": "dist/bin.js"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quzhiii/mcpskills-center.git"
+  },
+  "files": [
+    "dist/",
+    "config/",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test dist/**/*.test.js",
