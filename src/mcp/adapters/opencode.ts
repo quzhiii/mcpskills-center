@@ -54,6 +54,31 @@ function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
   return Object.keys(env).some(key => sensitiveKeys.some(s => key.toLowerCase().includes(s)));
 }
 
-export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (_servers: ParsedMcpConfigServer[]): string => {
-  throw new Error('MCP config write not yet implemented for this adapter');
+export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (servers: ParsedMcpConfigServer[], existingContent?: string): string => {
+  const existing: Record<string, unknown> = existingContent
+    ? JSON.parse(existingContent)
+    : {};
+
+  const mcp: Record<string, unknown> = {};
+  for (const server of servers) {
+    const entry: Record<string, unknown> = {};
+    if (server.command) {
+      entry.command = server.command;
+    }
+    if (server.host) {
+      entry.url = server.host;
+    }
+    entry.enabled = server.isEnabled;
+    mcp[server.id] = entry;
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(existing)) {
+    if (key !== 'mcp') {
+      result[key] = value;
+    }
+  }
+  result.mcp = mcp;
+
+  return JSON.stringify(result, null, 2);
 };

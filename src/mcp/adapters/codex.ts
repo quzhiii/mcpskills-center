@@ -1,4 +1,5 @@
 import { parseTomlConfig } from '../../config/parse.js';
+import { stringify } from 'smol-toml';
 import type { McpConfigAdapter, ParsedMcpConfigServer } from './base.js';
 
 export const parseCodexMcpConfig: McpConfigAdapter['parse'] = (content: string) => {
@@ -51,6 +52,19 @@ function checkSensitiveEnv(cfg: Record<string, unknown>): boolean {
   return Object.keys(env).some(key => sensitiveKeys.some(s => key.toLowerCase().includes(s)));
 }
 
-export const serializeCodexMcpConfig: McpConfigAdapter['serialize'] = (_servers: ParsedMcpConfigServer[]): string => {
-  throw new Error('MCP config write not yet implemented for this adapter');
+export const serializeCodexMcpConfig: McpConfigAdapter['serialize'] = (servers: ParsedMcpConfigServer[], _existingContent?: string): string => {
+  const mcpServers: Record<string, Record<string, unknown>> = {};
+
+  for (const server of servers) {
+    const entry: Record<string, unknown> = {};
+    if (server.command) {
+      entry.command = server.command;
+    }
+    if (server.host) {
+      entry.url = server.host;
+    }
+    mcpServers[server.id] = entry;
+  }
+
+  return stringify({ mcp_servers: mcpServers });
 };
