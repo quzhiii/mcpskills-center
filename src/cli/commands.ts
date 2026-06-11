@@ -171,6 +171,41 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
 }
 
 async function executeGovernance(cli: CliArgs, context: CommandContext): Promise<string> {
+  if (cli.options.restoreManifestPath) {
+    const syncResult = await context.restoreSyncBackupManifest(cli.options.restoreManifestPath, {
+      approvedRoots: context.approvedSyncRoots,
+    });
+
+    let mcpResult: any = null;
+    if (context.restoreMcpBackupManifest) {
+      const inventory = await context.runInventory();
+      const normalized = normalizeInventory(inventory);
+      const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
+      mcpResult = await context.restoreMcpBackupManifest(cli.options.restoreManifestPath, {
+        approvedRoots: Object.values(agentConfigPaths),
+      });
+    }
+
+    const lines = [
+      'Governance restore complete!',
+      '',
+      'Skills Sync:',
+      `   Restored Entries: ${syncResult.restoredEntries.length}`,
+      `   Manifest: ${cli.options.restoreManifestPath}`,
+    ];
+
+    if (mcpResult) {
+      lines.push(
+        '',
+        'MCP Governance:',
+        `   Restored Entries: ${mcpResult.restoredEntries.length}`,
+        `   Manifest: ${cli.options.restoreManifestPath}`,
+      );
+    }
+
+    return lines.join('\n');
+  }
+
   const inventory = await context.runInventory();
   const normalized = normalizeInventory(inventory);
   const audit = runAudit(normalized);

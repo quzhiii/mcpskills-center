@@ -1010,6 +1010,98 @@ test('governance --apply --confirm applies both skills sync and MCP', async () =
   assert.match(output, /MCP/);
 });
 
+test('governance --restore restores both skills sync and MCP', async () => {
+  const output = await executeCommand(makeCli('governance', { restoreManifestPath: 'C:/backups/manifest.json' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills', mcpConfigFile: 'C:/claude/.claude.json' },
+      ],
+      skills: [],
+      mcpServers: [],
+      profiles: [],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => [],
+    listAgents: async () => [],
+    discoverAgents: async () => ({ generatedAt: '2026-06-09T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
+    restoreSyncBackupManifest: async () => ({
+      restoredEntries: [
+        {
+          actionId: 'distribute:skill-a:0',
+          targetPath: 'C:/agent/skill-a',
+          backupPath: 'C:/backups/skill-a',
+          capturedAt: '2026-06-03T00:00:00.000Z',
+        },
+      ],
+    }),
+    restoreMcpBackupManifest: async () => ({
+      restoredEntries: [
+        {
+          mcpId: 'filesystem',
+          targetAgentName: 'claude-code',
+          targetConfigPath: 'C:/claude/.claude.json',
+          backupPath: 'C:/backups/backup.json',
+          backedUpAt: '2026-06-09T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  assert.match(output, /Governance restore complete/);
+  assert.match(output, /Skills Sync/);
+  assert.match(output, /Restored Entries: 1/);
+  assert.match(output, /MCP Governance/);
+  assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
+});
+
+test('governance --restore works without restoreMcpBackupManifest', async () => {
+  const output = await executeCommand(makeCli('governance', { restoreManifestPath: 'C:/backups/manifest.json' }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan: async () => ({ manifestPath: 'x', appliedActions: [], backupEntries: [], receipts: [] }),
+    restoreSyncBackupManifest: async () => ({
+      restoredEntries: [
+        {
+          actionId: 'distribute:skill-a:0',
+          targetPath: 'C:/agent/skill-a',
+          backupPath: 'C:/backups/skill-a',
+          capturedAt: '2026-06-03T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  assert.match(output, /Governance restore complete/);
+  assert.match(output, /Skills Sync/);
+  assert.match(output, /Restored Entries: 1/);
+  assert.doesNotMatch(output, /MCP Governance/);
+});
+
 test('executeCommand handles mcp restore with manifest path', async () => {
   const output = await executeCommand(makeCli('mcp', { subcommand: 'restore', profileName: 'C:/backups/manifest.json' }), {
     reportsDir: 'C:/reports',
