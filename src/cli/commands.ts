@@ -14,6 +14,7 @@ import { planSkillSync } from '../sync/planner.js';
 import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import { writeGovernanceReports } from '../governance/reporter.js';
+import { writeGovernanceConsole } from '../governance/console.js';
 import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
 import { diffGovernancePlans, formatPlanDiff } from '../governance/diff.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
@@ -319,6 +320,25 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
     },
   }, context.reportsDir);
 
+  const history = await readHistory(context.reportsDir);
+  const consolePath = await writeGovernanceConsole({
+    generatedAt: new Date().toISOString(),
+    skills: {
+      totalSkills: normalized.skills.length,
+      syncActions: syncPlan.actions.length,
+      writeActions: syncSummary.writeActions,
+      actionBreakdown: countActionTypes(syncPlan.actions),
+    },
+    mcp: {
+      totalServers: normalized.mcpServers.length,
+      governanceActions: mcpPlan.actions.length,
+      canonicalCandidates: mcpSummary.canonicalCandidates,
+      manualReview: mcpSummary.manualReviewActions,
+      actionBreakdown: countActionTypes(mcpPlan.actions),
+    },
+    history: history.entries,
+  }, context.reportsDir);
+
   return [
     'Governance dry-run complete!',
     '',
@@ -337,6 +357,7 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
     '',
     `   Reports written to: ${context.reportsDir}`,
     `   Unified report: ${context.reportsDir}/governance-current.json`,
+    `   Console: ${consolePath}`,
   ].join('\n');
 }
 
