@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { copyFile } from 'node:fs/promises';
 import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
@@ -14,6 +15,7 @@ import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import { writeGovernanceReports } from '../governance/reporter.js';
 import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
+import { diffGovernancePlans, formatPlanDiff } from '../governance/diff.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
@@ -62,6 +64,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeHealth(cli, context);
     case 'governance':
       return executeGovernance(cli, context);
+    case 'governance-diff':
+      return executeGovernanceDiff(context);
     case 'history':
       return executeHistory(context);
     case 'help':
@@ -93,6 +97,7 @@ export function renderHelp(): string {
     '  governance --dry-run          Unified skills + MCP governance plan',
     '  governance --apply --confirm  Apply both skills sync and MCP governance',
     '  governance --restore <path>   Restore both from manifest',
+    '  governance-diff                Compare current vs previous plans',
     '  history                        Show governance operation history',
     '  help                         Show this help',
   ].join('\n');
@@ -227,6 +232,8 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
   const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
 
   if (cli.options.apply) {
+    await snapshotCurrentPlansAsPrevious(context.reportsDir);
+
     const syncPlan = planSkillSync(normalized, {
       canonicalSkillsDir,
       strategy: 'symlink',
@@ -336,6 +343,11 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
 async function executeHistory(context: CommandContext): Promise<string> {
   const history = await readHistory(context.reportsDir);
   return formatHistory(history);
+}
+
+async function executeGovernanceDiff(context: CommandContext): Promise<string> {
+  const diff = await diffGovernancePlans(context.reportsDir);
+  return formatPlanDiff(diff);
 }
 
 async function executeScan(context: CommandContext): Promise<string> {
@@ -582,6 +594,20 @@ function buildAgentConfigPaths(agents: AgentConfig[]): Record<string, string> {
     }
   }
   return paths;
+}
+
+export async function snapshotCurrentPlansAsPrevious(reportsDir: string): Promise<void> {
+  const pairs: [string, string][] = [
+    ['sync-plan-current.json', 'sync-plan-previous.json'],
+    ['mcp-governance-plan-current.json', 'mcp-governance-plan-previous.json'],
+  ];
+  for (const [src, dst] of pairs) {
+    try {
+      await copyFile(join(reportsDir, src), join(reportsDir, dst));
+    } catch {
+      // No previous plan to snapshot
+    }
+  }
 }
 
 export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
