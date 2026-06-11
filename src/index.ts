@@ -22,6 +22,11 @@ import { join } from 'node:path';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 async function main() {
+  if (process.argv.slice(2).length === 0) {
+    console.log('Usage: mcpskills <command> [options]');
+    console.log('Run "mcpskills help" for full usage.');
+    return;
+  }
   const cli = parseCliArgs(process.argv.slice(2));
   const paths = createDefaultPaths(__dirname);
   const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
@@ -50,6 +55,20 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Error:', err);
+  const msg = err.message ?? String(err);
+  if (msg.includes('requires --confirm')) {
+    console.error(`Error: ${msg}`);
+    console.error('Hint: Add --confirm to apply changes.');
+  } else if (msg.includes('outside approved roots')) {
+    console.error(`Error: ${msg}`);
+    console.error('Hint: Check config/sync.json approvedSyncRoots.');
+  } else if (msg.includes('not eligible for MCP writes')) {
+    console.error(`Error: ${msg}`);
+    console.error('Hint: Only claude-code, opencode, and codex support MCP writes.');
+  } else if (msg.includes('Usage:')) {
+    console.error(msg);
+  } else {
+    console.error('Error:', msg);
+  }
   process.exit(1);
 });
