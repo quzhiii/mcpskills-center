@@ -100,6 +100,9 @@ test('renderHelp includes current commands', () => {
   assert.match(help, /mcp restore/);
   assert.match(help, /matrix/);
   assert.match(help, /health/);
+  assert.match(help, /governance --dry-run/);
+  assert.match(help, /governance --apply --confirm/);
+  assert.match(help, /governance --restore/);
 });
 
 test('executeCommand handles mcp plan dry-run and writes reports', async () => {
@@ -863,6 +866,35 @@ test('executeCommand mcp restore requires manifest path', async () => {
     }),
     { message: /Usage: node dist\/index\.js mcp restore <manifest-path>/ },
   );
+});
+
+test('governance --dry-run runs both skills sync and MCP governance', async () => {
+  const writes: string[] = [];
+  const output = await executeCommand(makeCli('governance', { dryRun: true }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => { writes.push('all-reports'); },
+    writeSyncPlanReports: async () => { writes.push('sync-plan'); },
+    writeCapabilityMatrixReports: async () => undefined,
+    writeMcpGovernancePlanReports: async () => { writes.push('mcp-governance-plan'); },
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /Governance dry-run complete/);
+  assert.match(output, /Skills/);
+  assert.match(output, /MCP Servers/);
+  assert.deepEqual(writes, ['all-reports', 'sync-plan', 'mcp-governance-plan']);
 });
 
 test('executeCommand handles mcp restore with manifest path', async () => {

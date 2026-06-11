@@ -59,7 +59,7 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
     case 'health':
       return executeHealth(cli, context);
     case 'governance':
-      return 'Governance command not yet implemented.';
+      return executeGovernance(cli, context);
     case 'help':
       return renderHelp();
   }
@@ -86,6 +86,9 @@ export function renderHelp(): string {
     '  matrix                       Build cross-agent capability matrix reports',
     '  health                       Run passive MCP health checks',
     '  health --active --allow-command <cmd> --timeout <ms>',
+    '  governance --dry-run          Unified skills + MCP governance plan',
+    '  governance --apply --confirm  Apply both skills sync and MCP governance',
+    '  governance --restore <path>   Restore both from manifest',
     '  help                         Show this help',
   ].join('\n');
 }
@@ -165,6 +168,47 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
   }
 
   return 'Usage: node dist/index.js mcp [plan|apply|restore]';
+}
+
+async function executeGovernance(cli: CliArgs, context: CommandContext): Promise<string> {
+  const inventory = await context.runInventory();
+  const normalized = normalizeInventory(inventory);
+  const audit = runAudit(normalized);
+
+  const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
+  const syncPlan = planSkillSync(normalized, {
+    canonicalSkillsDir,
+    strategy: 'symlink',
+    agentNames: normalized.agents.map(agent => agent.name),
+  });
+  await context.writeAllReports(normalized, audit, context.reportsDir);
+  await context.writeSyncPlanReports(syncPlan, context.reportsDir);
+  const syncSummary = buildSyncPlanSummary(syncPlan);
+
+  const mcpPlan = planMcpGovernance(normalized);
+  if (context.writeMcpGovernancePlanReports) {
+    await context.writeMcpGovernancePlanReports(mcpPlan, context.reportsDir, normalized.agents);
+  }
+  const mcpSummary = buildMcpGovernancePlanSummary(mcpPlan, normalized.agents);
+
+  return [
+    'Governance dry-run complete!',
+    '',
+    'Skills Sync:',
+    `   Skills: ${normalized.skills.length}`,
+    `   Sync Actions: ${syncPlan.actions.length}`,
+    `   Write Actions: ${syncSummary.writeActions}`,
+    `   Action Types: ${formatSyncSummaryActionTypes(syncSummary.actionTypes)}`,
+    '',
+    'MCP Governance:',
+    `   MCP Servers: ${normalized.mcpServers.length}`,
+    `   Governance Actions: ${mcpPlan.actions.length}`,
+    `   Canonical Candidates: ${mcpSummary.canonicalCandidates}`,
+    `   Manual Review: ${mcpSummary.manualReviewActions}`,
+    `   Write Actions: ${mcpSummary.writeActions}`,
+    '',
+    `   Reports written to: ${context.reportsDir}`,
+  ].join('\n');
 }
 
 async function executeScan(context: CommandContext): Promise<string> {
