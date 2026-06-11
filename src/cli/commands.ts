@@ -58,6 +58,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeMatrix(context);
     case 'health':
       return executeHealth(cli, context);
+    case 'governance':
+      return 'Governance command not yet implemented.';
     case 'help':
       return renderHelp();
   }
