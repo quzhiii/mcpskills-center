@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "taskCategories": [
+    {
+      "id": "coding",
+      "keywords": ["code", "implement", "fix", "bug", "test", "debug", "refactor", "build", "write", "create", "add", "modify"],
+      "requiredCapabilities": [],
+      "eligibleAgents": ["claude-code", "opencode", "codex"],
+      "preferredAgent": "claude-code"
+    },
+    {
+      "id": "research",
+      "keywords": ["research", "investigate", "search", "analyze", "compare", "review", "study"],
+      "requiredCapabilities": [],
+      "eligibleAgents": ["claude-code", "opencode"],
+      "preferredAgent": "claude-code"
+    },
+    {
+      "id": "mcp-heavy",
+      "keywords": ["mcp", "server", "file", "browser", "web", "database", "api"],
+      "requiredCapabilities": [],
+      "eligibleAgents": ["claude-code"],
+      "preferredAgent": "claude-code"
+    },
+    {
+      "id": "docs",
+      "keywords": ["document", "readme", "docs", "comment", "explain"],
+      "requiredCapabilities": [],
+      "eligibleAgents": ["claude-code", "opencode", "codex"],
+      "preferredAgent": "claude-code"
+    }
+  ],
+  "fallbackOrder": ["claude-code", "opencode", "codex"]
+}
