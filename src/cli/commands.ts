@@ -15,13 +15,13 @@ import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import { writeGovernanceReports } from '../governance/reporter.js';
 import { writeGovernanceConsole } from '../governance/console.js';
-import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
+import { readHistory, appendHistoryEntry, formatHistory, type GovernanceHistory } from '../governance/history.js';
 import { diffGovernancePlans, formatPlanDiff } from '../governance/diff.js';
 import { routeTask } from '../routing/router.js';
-import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
+import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpApplyResult, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
-import type { restoreMcpBackupManifest } from '../mcp/restore.js';
+import type { restoreMcpBackupManifest, RestoreMcpResult } from '../mcp/restore.js';
 import type Database from 'better-sqlite3';
 
 export interface CommandContext {
@@ -194,7 +194,7 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
       approvedRoots: context.approvedSyncRoots,
     });
 
-    let mcpResult: any = null;
+    let mcpResult: RestoreMcpResult | null = null;
     if (context.restoreMcpBackupManifest) {
       const inventory = await context.runInventory();
       const normalized = normalizeInventory(inventory);
@@ -262,7 +262,7 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
       approvedRoots: context.approvedSyncRoots,
     });
 
-    let mcpResult: any = null;
+    let mcpResult: McpApplyResult | null = null;
     if (context.applyMcpPlan) {
       const mcpPlan = planMcpGovernance(normalized);
       const agentConfigPaths = buildAgentConfigPaths(normalized.agents);
@@ -418,7 +418,7 @@ async function executeHistory(context: CommandContext): Promise<string> {
   if (context.db) {
     const { readGovernanceHistory } = await import('../db/index.js');
     const entries = readGovernanceHistory(context.db);
-    return formatHistory({ entries: entries as any });
+    return formatHistory({ entries: entries as GovernanceHistory['entries'] });
   }
   const history = await readHistory(context.reportsDir);
   return formatHistory(history);

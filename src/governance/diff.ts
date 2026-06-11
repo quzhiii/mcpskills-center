@@ -51,7 +51,7 @@ export function formatPlanDiff(diff: PlanDiffResult): string {
   return lines.join('\n');
 }
 
-async function readPlanJson(path: string): Promise<any> {
+async function readPlanJson(path: string): Promise<Record<string, unknown> | null> {
   try {
     return JSON.parse(await readFile(path, 'utf-8'));
   } catch {
@@ -59,7 +59,7 @@ async function readPlanJson(path: string): Promise<any> {
   }
 }
 
-function extractActionIds(plan: any): string[] {
+function extractActionIds(plan: Record<string, unknown> | null): string[] {
   if (!plan || !plan.actions) return [];
-  return plan.actions.map((a: any) => a.id);
+  return (plan.actions as Array<{ id: string }>).map((a: { id: string }) => a.id);
 }
