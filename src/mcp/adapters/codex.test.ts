@@ -71,3 +71,24 @@ test('serializeCodexMcpConfig handles empty server list', () => {
   const result = serializeCodexMcpConfig([]);
   assert.ok(typeof result === 'string');
 });
+
+test('Codex adapter parses disabled servers', () => {
+  const servers = parseCodexMcpConfig(`
+[mcp_servers.fs]
+command = "npx"
+enabled = false
+`);
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].isEnabled, false);
+});
+
+test('serializeCodexMcpConfig preserves isEnabled state', () => {
+  const servers: ParsedMcpConfigServer[] = [
+    { id: 'fs', transport: 'stdio', command: 'npx', isEnabled: true, hasSensitiveEnv: false, scope: { kind: 'global' } },
+    { id: 'disabled', transport: 'stdio', command: 'node', isEnabled: false, hasSensitiveEnv: false, scope: { kind: 'global' } },
+  ];
+  const result = serializeCodexMcpConfig(servers);
+  const parsed = parseCodexMcpConfig(result);
+  assert.equal(parsed.find(s => s.id === 'fs')?.isEnabled, true);
+  assert.equal(parsed.find(s => s.id === 'disabled')?.isEnabled, false);
+});

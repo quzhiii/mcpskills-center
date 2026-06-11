@@ -14,7 +14,7 @@ export const parseCodexMcpConfig: McpConfigAdapter['parse'] = (content: string) 
       transport: detectTransport(cfg),
       command: extractCommand(cfg),
       host: typeof cfg.url === 'string' ? cfg.url : undefined,
-      isEnabled: true,
+      isEnabled: cfg.enabled !== false,
       hasSensitiveEnv: checkSensitiveEnv(cfg),
       scope: { kind: 'global' },
     } satisfies ParsedMcpConfigServer;
@@ -32,6 +32,7 @@ export const serializeCodexMcpConfig: McpConfigAdapter['serialize'] = (servers: 
     if (server.host) {
       entry.url = server.host;
     }
+    entry.enabled = server.isEnabled;
     mcpServers[server.id] = entry;
   }
 
