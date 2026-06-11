@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { copyFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
@@ -710,6 +711,7 @@ export async function snapshotCurrentPlansAsPrevious(reportsDir: string): Promis
 }
 
 export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
+  const home = homedir();
   return {
     reportsDir: join(dirname, '..', 'reports'),
     canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
@@ -719,9 +721,9 @@ export function createDefaultPaths(dirname: string): Pick<CommandContext, 'repor
     agentConfigPath: join(dirname, '..', 'config', 'agents.json'),
     approvedSyncRoots: [
       join(dirname, '..', 'config', 'canonical-skills'),
-      'C:/Users/quzhi/.claude/skills',
-      'C:/Users/quzhi/.opencode/skills',
-      'C:/Users/quzhi/.codex/skills',
+      join(home, '.claude', 'skills'),
+      join(home, '.opencode', 'skills'),
+      join(home, '.codex', 'skills'),
     ],
   };
 }
