@@ -25,8 +25,11 @@ export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (server
     ? JSON.parse(existingContent)
     : {};
 
+  const existingMcp = asRecord(existing.mcp);
+
   const mcp: Record<string, unknown> = {};
   for (const server of servers) {
+    const existingServer = asRecord(existingMcp[server.id]);
     const entry: Record<string, unknown> = {};
     if (server.command) {
       entry.command = server.command;
@@ -35,6 +38,8 @@ export const serializeOpenCodeMcpConfig: McpConfigAdapter['serialize'] = (server
       entry.url = server.host;
     }
     entry.enabled = server.isEnabled;
+    if (existingServer.env) entry.env = existingServer.env;
+    if (existingServer.environment) entry.environment = existingServer.environment;
     mcp[server.id] = entry;
   }
 

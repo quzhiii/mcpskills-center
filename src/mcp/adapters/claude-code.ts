@@ -45,6 +45,9 @@ export const serializeClaudeCodeMcpConfig: McpConfigAdapter['serialize'] = (serv
     ? JSON.parse(existingContent)
     : {};
 
+  const existingGlobalServers = asRecord(existing.mcpServers);
+  const existingProjects = asRecord(existing.projects);
+
   const globalServers: Record<string, unknown> = {};
   const projectServers: Record<string, Record<string, unknown>> = {};
 
@@ -57,11 +60,19 @@ export const serializeClaudeCodeMcpConfig: McpConfigAdapter['serialize'] = (serv
       const name = server.id.startsWith('global:')
         ? server.id.slice('global:'.length)
         : server.id;
+      const existingServer = asRecord(existingGlobalServers[name]);
+      if (existingServer.env) serverObj.env = existingServer.env;
+      if (existingServer.environment) serverObj.environment = existingServer.environment;
       globalServers[name] = serverObj;
     } else if (server.scope.kind === 'project' && server.scope.id) {
       const projectId = server.scope.id;
       const name = server.id.slice(projectId.length + 1);
       if (!projectServers[projectId]) projectServers[projectId] = {};
+      const existingProject = asRecord(existingProjects[projectId]);
+      const existingProjectServers = asRecord(existingProject.mcpServers);
+      const existingServer = asRecord(existingProjectServers[name]);
+      if (existingServer.env) serverObj.env = existingServer.env;
+      if (existingServer.environment) serverObj.environment = existingServer.environment;
       projectServers[projectId][name] = serverObj;
     }
   }
@@ -70,12 +81,12 @@ export const serializeClaudeCodeMcpConfig: McpConfigAdapter['serialize'] = (serv
   result.mcpServers = globalServers;
 
   if (Object.keys(projectServers).length > 0) {
-    const existingProjects = asRecord(result.projects);
+    const mergedProjects = { ...existingProjects };
     for (const [pid, serversMap] of Object.entries(projectServers)) {
-      const existingProject = asRecord(existingProjects[pid]);
-      existingProjects[pid] = { ...existingProject, mcpServers: serversMap };
+      const existingProject = asRecord(mergedProjects[pid]);
+      mergedProjects[pid] = { ...existingProject, mcpServers: serversMap };
     }
-    result.projects = existingProjects;
+    result.projects = mergedProjects;
   }
 
   return JSON.stringify(result, null, 2);
