@@ -15,7 +15,9 @@ import { loadAgentRegistry } from './config/agents.js';
 import { DEFAULT_AGENTS } from './scanner/index.js';
 import { discoverAgents } from './agents/discovery.js';
 import { writeAgentDiscoveryReports } from './agents/reporter.js';
+import { openGovernanceDb } from './db/index.js';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -24,6 +26,8 @@ async function main() {
   const paths = createDefaultPaths(__dirname);
   const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
   const agentRegistry = await loadAgentRegistry(paths.agentConfigPath, DEFAULT_AGENTS);
+  const dbPath = join(paths.reportsDir, '..', 'data', 'governance.db');
+  const db = openGovernanceDb(dbPath);
   const output = await executeCommand(cli, {
     ...paths,
     approvedSyncRoots: syncConfig.approvedSyncRoots,
@@ -40,6 +44,7 @@ async function main() {
     restoreSyncBackupManifest,
     applyMcpPlan,
     restoreMcpBackupManifest,
+    db,
   });
   console.log(output);
 }

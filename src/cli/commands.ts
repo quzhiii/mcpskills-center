@@ -21,6 +21,7 @@ import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGove
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
 import type { restoreMcpBackupManifest } from '../mcp/restore.js';
+import type Database from 'better-sqlite3';
 
 export interface CommandContext {
   reportsDir: string;
@@ -43,6 +44,7 @@ export interface CommandContext {
   restoreSyncBackupManifest: typeof restoreSyncBackupManifest;
   applyMcpPlan?: typeof applyMcpPlan;
   restoreMcpBackupManifest?: typeof restoreMcpBackupManifest;
+  db?: Database.Database;
 }
 
 export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
@@ -232,6 +234,16 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
   const audit = runAudit(normalized);
   const canonicalSkillsDir = cli.options.canonicalDir ?? context.canonicalSkillsDir;
 
+  if (context.db) {
+    const { insertInventorySnapshot } = await import('../db/index.js');
+    insertInventorySnapshot(context.db, {
+      capturedAt: new Date().toISOString(),
+      skillCount: normalized.skills.length,
+      mcpServerCount: normalized.mcpServers.length,
+      agentCount: normalized.agents.length,
+    });
+  }
+
   if (cli.options.apply) {
     await snapshotCurrentPlansAsPrevious(context.reportsDir);
 
@@ -287,6 +299,43 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
       manifestPath: syncResult.manifestPath,
       summary: `Applied ${syncResult.appliedActions.length} skills${mcpResult ? ` + ${mcpResult.appliedActions.length} MCP` : ''}`,
     });
+
+    if (context.db) {
+      const { insertActionResult, insertGovernanceHistory } = await import('../db/index.js');
+      const runTimestamp = new Date().toISOString();
+
+      insertGovernanceHistory(context.db, {
+        timestamp: runTimestamp,
+        operation: 'apply',
+        domain: mcpResult ? 'unified' : 'skills',
+        actionCount: syncResult.appliedActions.length + (mcpResult?.appliedActions.length ?? 0),
+        manifestPath: syncResult.manifestPath,
+        summary: `Applied ${syncResult.appliedActions.length} skills + ${mcpResult?.appliedActions.length ?? 0} MCP actions`,
+      });
+
+      for (const action of syncResult.appliedActions) {
+        insertActionResult(context.db, {
+          runTimestamp,
+          domain: 'skills',
+          actionId: action.id,
+          actionType: action.type,
+          target: action.targetPath,
+          status: 'applied',
+        });
+      }
+      if (mcpResult) {
+        for (const action of mcpResult.appliedActions) {
+          insertActionResult(context.db, {
+            runTimestamp,
+            domain: 'mcp',
+            actionId: action.id,
+            actionType: action.type,
+            target: action.targetAgentName,
+            status: 'applied',
+          });
+        }
+      }
+    }
 
     return lines.join('\n');
   }
@@ -362,6 +411,11 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
 }
 
 async function executeHistory(context: CommandContext): Promise<string> {
+  if (context.db) {
+    const { readGovernanceHistory } = await import('../db/index.js');
+    const entries = readGovernanceHistory(context.db);
+    return formatHistory({ entries: entries as any });
+  }
   const history = await readHistory(context.reportsDir);
   return formatHistory(history);
 }

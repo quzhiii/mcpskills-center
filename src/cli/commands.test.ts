@@ -5,6 +5,8 @@ import { applySyncPlan } from '../sync/apply.js';
 import type { CliArgs } from '../cli.js';
 import type { AgentConfig, Inventory, Profile } from '../types/index.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
+import Database from 'better-sqlite3';
+import { openGovernanceDb, readGovernanceHistory, readActionResults, readInventorySnapshots } from '../db/index.js';
 
 function makeCli(command: CliArgs['command'], options: Partial<CliArgs['options']> = {}): CliArgs {
   return {
@@ -1171,4 +1173,162 @@ test('executeCommand handles history command', async () => {
   });
 
   assert.match(output, /No governance operations recorded yet/);
+});
+
+test('history command uses SQLite when db is provided', async () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE governance_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      action_count INTEGER NOT NULL,
+      manifest_path TEXT,
+      summary TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.prepare(`
+    INSERT INTO governance_history (timestamp, operation, domain, action_count, manifest_path, summary)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run('2026-06-10T00:00:00.000Z', 'apply', 'unified', 5, 'C:/manifest.json', 'Applied 3 skills + 2 MCP actions');
+
+  const output = await executeCommand(makeCli('history'), {
+    reportsDir: 'C:/nonexistent-reports-dir',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+    db,
+  });
+
+  assert.match(output, /Governance Operation History/);
+  assert.match(output, /Applied 3 skills \+ 2 MCP actions/);
+  assert.match(output, /manifest: C:\/manifest\.json/);
+  db.close();
+});
+
+test('governance --apply stores action results and history in SQLite', async () => {
+  const db = openGovernanceDb(':memory:');
+
+  const output = await executeCommand(makeCli('governance', { apply: true, confirm: true }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => ({
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      agents: [
+        { name: 'claude-code', configDir: 'C:/claude', skillsDir: 'C:/claude/skills', mcpConfigFile: 'C:/claude/.claude.json' },
+      ],
+      skills: [
+        {
+          id: 'skill-a',
+          displayName: 'skill-a',
+          sourcePath: 'C:/canonical/skill-a',
+          agentInstallPaths: ['C:/agent/skill-a'],
+          isCanonical: false,
+          isSymlink: false,
+          hasSkillMd: true,
+          frontmatterValid: true,
+          isDuplicate: true,
+        },
+      ],
+      mcpServers: [],
+      profiles: [],
+    }),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    writeMcpGovernancePlanReports: async () => undefined,
+    loadProfiles: async () => [],
+    listAgents: async () => [],
+    discoverAgents: async () => ({ generatedAt: '2026-06-09T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan: async () => ({
+      manifestPath: 'C:/backups/sync-manifest.json',
+      appliedActions: [
+        {
+          id: 'distribute:skill-a:0',
+          type: 'distribute',
+          skillId: 'skill-a',
+          sourcePath: 'C:/canonical/skill-a',
+          targetPath: 'C:/agent/skill-a',
+          mode: 'copy',
+          reason: 'Distribute canonical skill',
+          requiresWrite: true,
+        },
+      ],
+      backupEntries: [],
+      receipts: [],
+    }),
+    restoreSyncBackupManifest: async () => ({ restoredEntries: [] }),
+    db,
+  });
+
+  assert.match(output, /Governance apply complete/);
+
+  const history = readGovernanceHistory(db);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].operation, 'apply');
+  assert.equal(history[0].domain, 'skills');
+  assert.equal(history[0].actionCount, 1);
+
+  const actions = readActionResults(db);
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].domain, 'skills');
+  assert.equal(actions[0].actionId, 'distribute:skill-a:0');
+  assert.equal(actions[0].status, 'applied');
+  db.close();
+});
+
+test('governance --dry-run stores inventory snapshot in SQLite', async () => {
+  const db = openGovernanceDb(':memory:');
+
+  const output = await executeCommand(makeCli('governance', { dryRun: true }), {
+    reportsDir: 'C:/reports',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    writeMcpGovernancePlanReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+    db,
+  });
+
+  assert.match(output, /Governance dry-run complete/);
+
+  const snapshots = readInventorySnapshots(db);
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].skillCount, 1);
+  assert.equal(snapshots[0].mcpServerCount, 1);
+  assert.equal(snapshots[0].agentCount, 1);
+  db.close();
 });

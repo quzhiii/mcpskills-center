@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Runtime data
+data/
+
 # Local git worktrees
 .worktrees/
 
