@@ -20,3 +20,8 @@ test('parseCliArgs parses governance command with --restore', () => {
   assert.equal(args.command, 'governance');
   assert.equal(args.options.restoreManifestPath, 'path/to/manifest.json');
 });
+
+test('parseCliArgs parses history command', () => {
+  const args = parseCliArgs(['history']);
+  assert.equal(args.command, 'history');
+});

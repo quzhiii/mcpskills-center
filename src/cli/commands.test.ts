@@ -103,6 +103,7 @@ test('renderHelp includes current commands', () => {
   assert.match(help, /governance --dry-run/);
   assert.match(help, /governance --apply --confirm/);
   assert.match(help, /governance --restore/);
+  assert.match(help, /history/);
 });
 
 test('executeCommand handles mcp plan dry-run and writes reports', async () => {
@@ -1146,4 +1147,28 @@ test('executeCommand handles mcp restore with manifest path', async () => {
   assert.match(output, /MCP restore complete!/);
   assert.match(output, /Restored Entries: 1/);
   assert.match(output, /Manifest: C:\/backups\/manifest\.json/);
+});
+
+test('executeCommand handles history command', async () => {
+  const output = await executeCommand(makeCli('history'), {
+    reportsDir: 'C:/nonexistent-reports-dir',
+    canonicalSkillsDir: 'C:/canonical',
+    backupsDir: 'C:/backups',
+    profilesDir: 'C:/profiles',
+    syncConfigPath: 'C:/config/sync.json',
+    agentConfigPath: 'C:/config/agents.json',
+    approvedSyncRoots: ['C:/canonical', 'C:/agent'],
+    runInventory: async () => makeInventory(),
+    writeAllReports: async () => undefined,
+    writeSyncPlanReports: async () => undefined,
+    writeCapabilityMatrixReports: async () => undefined,
+    loadProfiles: async () => profiles,
+    listAgents: async () => agents,
+    discoverAgents: async () => ({ generatedAt: '2026-06-04T00:00:00.000Z', candidates: [] }),
+    writeAgentDiscoveryReports: async () => undefined,
+    applySyncPlan,
+    restoreSyncBackupManifest,
+  });
+
+  assert.match(output, /No governance operations recorded yet/);
 });

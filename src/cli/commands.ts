@@ -13,6 +13,7 @@ import { planSkillSync } from '../sync/planner.js';
 import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
 import { writeGovernanceReports } from '../governance/reporter.js';
+import { readHistory, appendHistoryEntry, formatHistory } from '../governance/history.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
@@ -61,6 +62,8 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeHealth(cli, context);
     case 'governance':
       return executeGovernance(cli, context);
+    case 'history':
+      return executeHistory(context);
     case 'help':
       return renderHelp();
   }
@@ -90,6 +93,7 @@ export function renderHelp(): string {
     '  governance --dry-run          Unified skills + MCP governance plan',
     '  governance --apply --confirm  Apply both skills sync and MCP governance',
     '  governance --restore <path>   Restore both from manifest',
+    '  history                        Show governance operation history',
     '  help                         Show this help',
   ].join('\n');
 }
@@ -205,6 +209,15 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
       );
     }
 
+    await appendHistoryEntry(context.reportsDir, {
+      timestamp: new Date().toISOString(),
+      operation: 'restore',
+      domain: mcpResult ? 'unified' : 'skills',
+      actionCount: syncResult.restoredEntries.length + (mcpResult?.restoredEntries.length ?? 0),
+      manifestPath: cli.options.restoreManifestPath,
+      summary: `Restored ${syncResult.restoredEntries.length} skills${mcpResult ? ` + ${mcpResult.restoredEntries.length} MCP` : ''}`,
+    });
+
     return lines.join('\n');
   }
 
@@ -258,6 +271,15 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
       );
     }
 
+    await appendHistoryEntry(context.reportsDir, {
+      timestamp: new Date().toISOString(),
+      operation: 'apply',
+      domain: mcpResult ? 'unified' : 'skills',
+      actionCount: syncResult.appliedActions.length + (mcpResult?.appliedActions.length ?? 0),
+      manifestPath: syncResult.manifestPath,
+      summary: `Applied ${syncResult.appliedActions.length} skills${mcpResult ? ` + ${mcpResult.appliedActions.length} MCP` : ''}`,
+    });
+
     return lines.join('\n');
   }
 
@@ -309,6 +331,11 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
     `   Reports written to: ${context.reportsDir}`,
     `   Unified report: ${context.reportsDir}/governance-current.json`,
   ].join('\n');
+}
+
+async function executeHistory(context: CommandContext): Promise<string> {
+  const history = await readHistory(context.reportsDir);
+  return formatHistory(history);
 }
 
 async function executeScan(context: CommandContext): Promise<string> {
