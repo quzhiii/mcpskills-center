@@ -894,6 +894,7 @@ test('governance --dry-run runs both skills sync and MCP governance', async () =
   assert.match(output, /Governance dry-run complete/);
   assert.match(output, /Skills/);
   assert.match(output, /MCP Servers/);
+  assert.match(output, /Unified report: C:\/reports\/governance-current\.json/);
   assert.deepEqual(writes, ['all-reports', 'sync-plan', 'mcp-governance-plan']);
 });
 

@@ -12,6 +12,7 @@ import { applySyncPlan } from '../sync/apply.js';
 import { planSkillSync } from '../sync/planner.js';
 import { buildSyncPlanSummary } from '../sync/reporter.js';
 import { restoreSyncBackupManifest } from '../sync/restore.js';
+import { writeGovernanceReports } from '../governance/reporter.js';
 import type { AgentConfig, AgentDiscoveryReport, AuditReport, Inventory, McpGovernancePlan, Profile, SyncPlan } from '../types/index.js';
 import type { CliArgs } from '../cli.js';
 import type { applyMcpPlan } from '../mcp/apply.js';
@@ -163,9 +164,10 @@ async function executeMcp(cli: CliArgs, context: CommandContext): Promise<string
       `   Low-Ownership Agents: ${summary.lowOwnershipAgentCount}`,
       `   Action Types: ${formatMcpSummaryActionTypes(summary.actionTypes)}`,
       '',
-      `   Reports written to: ${context.reportsDir}`,
-    ].join('\n');
-  }
+    `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
+  ].join('\n');
+}
 
   return 'Usage: node dist/index.js mcp [plan|apply|restore]';
 }
@@ -274,6 +276,20 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
   }
   const mcpSummary = buildMcpGovernancePlanSummary(mcpPlan, normalized.agents);
 
+  await writeGovernanceReports({
+    generatedAt: new Date().toISOString(),
+    skills: {
+      totalSkills: normalized.skills.length,
+      syncActions: syncPlan.actions.length,
+      writeActions: syncSummary.writeActions,
+    },
+    mcp: {
+      totalServers: normalized.mcpServers.length,
+      governanceActions: mcpPlan.actions.length,
+      canonicalCandidates: mcpSummary.canonicalCandidates,
+    },
+  }, context.reportsDir);
+
   return [
     'Governance dry-run complete!',
     '',
@@ -291,6 +307,7 @@ async function executeGovernance(cli: CliArgs, context: CommandContext): Promise
     `   Write Actions: ${mcpSummary.writeActions}`,
     '',
     `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
   ].join('\n');
 }
 
@@ -473,8 +490,9 @@ async function executeAgents(cli: CliArgs, context: CommandContext): Promise<str
         'Agent discovery complete!',
         `   Candidates: ${report.candidates.length}`,
         '',
-        `   Reports written to: ${context.reportsDir}`,
-      ].join('\n');
+    `   Reports written to: ${context.reportsDir}`,
+    `   Unified report: ${context.reportsDir}/governance-current.json`,
+  ].join('\n');
     }
     default:
       return 'Usage: node dist/index.js agents [list|discover]';
