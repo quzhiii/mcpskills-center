@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalize } from 'node:path';
-import { createDefaultPaths, executeCommand, renderHelp, resolveUserDataRoot, type RuntimePathEnv } from './commands.js';
+import { createDefaultPaths, executeCommand, resolveGovernanceDbPath, renderHelp, resolveUserDataRoot, type RuntimePathEnv } from './commands.js';
 import { applySyncPlan } from '../sync/apply.js';
 import type { CliArgs } from '../cli.js';
 import type { AgentConfig, Inventory, Profile } from '../types/index.js';
@@ -127,6 +127,16 @@ test('resolveUserDataRoot uses XDG-style path on Linux', () => {
   assert.equal(root, normalize('/home/test/.local/share/mcpskills-center'));
 });
 
+test('resolveUserDataRoot uses XDG_DATA_HOME on Linux when provided', () => {
+  const root = resolveUserDataRoot({
+    platform: 'linux',
+    homeDir: '/home/test',
+    xdgDataHome: '/var/app-data/test',
+  });
+
+  assert.equal(root, normalize('/var/app-data/test/mcpskills-center'));
+});
+
 test('createDefaultPaths keeps config paths package-relative and runtime paths user-relative', () => {
   const paths = createDefaultPaths('C:/pkg/dist', {
     platform: 'win32',
@@ -151,6 +161,19 @@ test('createDefaultPaths does not place runtime data under the package directory
 
   assert.equal(paths.reportsDir.startsWith('C:/pkg'), false);
   assert.equal(paths.backupsDir.startsWith('C:/pkg'), false);
+});
+
+test('resolveGovernanceDbPath keeps SQLite data beside runtime reports', () => {
+  const paths = createDefaultPaths('C:/pkg/dist', {
+    platform: 'win32',
+    homeDir: 'C:/Users/test',
+    appData: 'C:/Users/test/AppData/Roaming',
+  });
+
+  const dbPath = resolveGovernanceDbPath(paths.reportsDir);
+
+  assert.equal(dbPath, normalize('C:/Users/test/AppData/Roaming/mcpskills-center/data/governance.db'));
+  assert.equal(dbPath.startsWith('C:/pkg'), false);
 });
 
 test('renderHelp includes current commands', () => {

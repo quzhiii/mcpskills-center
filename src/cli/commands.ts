@@ -54,6 +54,7 @@ export interface RuntimePathEnv {
   platform: NodeJS.Platform;
   homeDir: string;
   appData?: string;
+  xdgDataHome?: string;
 }
 
 export function resolveUserDataRoot(env: RuntimePathEnv): string {
@@ -67,7 +68,11 @@ export function resolveUserDataRoot(env: RuntimePathEnv): string {
     return join(env.homeDir, 'Library', 'Application Support', 'mcpskills-center');
   }
 
-  return join(env.homeDir, '.local', 'share', 'mcpskills-center');
+  return join(env.xdgDataHome ?? join(env.homeDir, '.local', 'share'), 'mcpskills-center');
+}
+
+export function resolveGovernanceDbPath(reportsDir: string): string {
+  return join(reportsDir, '..', 'data', 'governance.db');
 }
 
 export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
@@ -781,6 +786,7 @@ export function createDefaultPaths(
     platform: process.platform,
     homeDir: homedir(),
     appData: process.env.APPDATA,
+    xdgDataHome: process.env.XDG_DATA_HOME,
   },
 ): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
   const home = runtimeEnv.homeDir;
