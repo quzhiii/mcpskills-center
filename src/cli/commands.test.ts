@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { executeCommand, renderHelp } from './commands.js';
+import { normalize } from 'node:path';
+import { createDefaultPaths, executeCommand, renderHelp, resolveUserDataRoot, type RuntimePathEnv } from './commands.js';
 import { applySyncPlan } from '../sync/apply.js';
 import type { CliArgs } from '../cli.js';
 import type { AgentConfig, Inventory, Profile } from '../types/index.js';
@@ -88,6 +89,69 @@ const agents: AgentConfig[] = [
     skillsDir: 'C:/qoder/skills',
   },
 ];
+
+test('resolveUserDataRoot uses APPDATA on Windows when provided', () => {
+  const root = resolveUserDataRoot({
+    platform: 'win32',
+    homeDir: 'C:/Users/test',
+    appData: 'C:/Users/test/AppData/Roaming',
+  });
+
+  assert.equal(root, normalize('C:/Users/test/AppData/Roaming/mcpskills-center'));
+});
+
+test('resolveUserDataRoot falls back to Roaming under home on Windows', () => {
+  const root = resolveUserDataRoot({
+    platform: 'win32',
+    homeDir: 'C:/Users/test',
+  });
+
+  assert.equal(root, normalize('C:/Users/test/AppData/Roaming/mcpskills-center'));
+});
+
+test('resolveUserDataRoot uses Application Support on macOS', () => {
+  const root = resolveUserDataRoot({
+    platform: 'darwin',
+    homeDir: '/Users/test',
+  });
+
+  assert.equal(root, normalize('/Users/test/Library/Application Support/mcpskills-center'));
+});
+
+test('resolveUserDataRoot uses XDG-style path on Linux', () => {
+  const root = resolveUserDataRoot({
+    platform: 'linux',
+    homeDir: '/home/test',
+  });
+
+  assert.equal(root, normalize('/home/test/.local/share/mcpskills-center'));
+});
+
+test('createDefaultPaths keeps config paths package-relative and runtime paths user-relative', () => {
+  const paths = createDefaultPaths('C:/pkg/dist', {
+    platform: 'win32',
+    homeDir: 'C:/Users/test',
+    appData: 'C:/Users/test/AppData/Roaming',
+  });
+
+  assert.equal(paths.canonicalSkillsDir, normalize('C:/pkg/config/canonical-skills'));
+  assert.equal(paths.profilesDir, normalize('C:/pkg/config/profiles'));
+  assert.equal(paths.syncConfigPath, normalize('C:/pkg/config/sync.json'));
+  assert.equal(paths.agentConfigPath, normalize('C:/pkg/config/agents.json'));
+  assert.equal(paths.reportsDir, normalize('C:/Users/test/AppData/Roaming/mcpskills-center/reports'));
+  assert.equal(paths.backupsDir, normalize('C:/Users/test/AppData/Roaming/mcpskills-center/backups'));
+});
+
+test('createDefaultPaths does not place runtime data under the package directory', () => {
+  const paths = createDefaultPaths('C:/pkg/dist', {
+    platform: 'win32',
+    homeDir: 'C:/Users/test',
+    appData: 'C:/Users/test/AppData/Roaming',
+  });
+
+  assert.equal(paths.reportsDir.startsWith('C:/pkg'), false);
+  assert.equal(paths.backupsDir.startsWith('C:/pkg'), false);
+});
 
 test('renderHelp includes current commands', () => {
   const help = renderHelp();

@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { copyFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import process from 'node:process';
 import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
@@ -47,6 +48,26 @@ export interface CommandContext {
   applyMcpPlan?: typeof applyMcpPlan;
   restoreMcpBackupManifest?: typeof restoreMcpBackupManifest;
   db?: Database.Database;
+}
+
+export interface RuntimePathEnv {
+  platform: NodeJS.Platform;
+  homeDir: string;
+  appData?: string;
+}
+
+export function resolveUserDataRoot(env: RuntimePathEnv): string {
+  if (env.platform === 'win32') {
+    return env.appData
+      ? join(env.appData, 'mcpskills-center')
+      : join(env.homeDir, 'AppData', 'Roaming', 'mcpskills-center');
+  }
+
+  if (env.platform === 'darwin') {
+    return join(env.homeDir, 'Library', 'Application Support', 'mcpskills-center');
+  }
+
+  return join(env.homeDir, '.local', 'share', 'mcpskills-center');
 }
 
 export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
@@ -754,12 +775,20 @@ export async function snapshotCurrentPlansAsPrevious(reportsDir: string): Promis
   }
 }
 
-export function createDefaultPaths(dirname: string): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
-  const home = homedir();
+export function createDefaultPaths(
+  dirname: string,
+  runtimeEnv: RuntimePathEnv = {
+    platform: process.platform,
+    homeDir: homedir(),
+    appData: process.env.APPDATA,
+  },
+): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
+  const home = runtimeEnv.homeDir;
+  const userDataRoot = resolveUserDataRoot(runtimeEnv);
   return {
-    reportsDir: join(dirname, '..', 'reports'),
+    reportsDir: join(userDataRoot, 'reports'),
     canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
-    backupsDir: join(dirname, '..', 'backups'),
+    backupsDir: join(userDataRoot, 'backups'),
     profilesDir: join(dirname, '..', 'config', 'profiles'),
     syncConfigPath: join(dirname, '..', 'config', 'sync.json'),
     agentConfigPath: join(dirname, '..', 'config', 'agents.json'),

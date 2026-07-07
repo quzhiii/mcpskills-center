@@ -31,7 +31,8 @@ async function main() {
   const paths = createDefaultPaths(__dirname);
   const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
   const agentRegistry = await loadAgentRegistry(paths.agentConfigPath, DEFAULT_AGENTS);
-  const dbPath = join(paths.reportsDir, '..', 'data', 'governance.db');
+  const runtimeDataRoot = join(paths.reportsDir, '..');
+  const dbPath = join(runtimeDataRoot, 'data', 'governance.db');
   const db = openGovernanceDb(dbPath);
   const output = await executeCommand(cli, {
     ...paths,
