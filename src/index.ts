@@ -8,7 +8,7 @@ import { writeMcpGovernancePlanReports } from './mcp/reporter.js';
 import { applyMcpPlan } from './mcp/apply.js';
 import { restoreMcpBackupManifest } from './mcp/restore.js';
 import { loadProfiles } from './profiles/loader.js';
-import { createDefaultPaths, executeCommand } from './cli/commands.js';
+import { createDefaultPaths, executeCommand, resolveGovernanceDbPath } from './cli/commands.js';
 import { loadSyncConfig } from './config/sync.js';
 import { restoreSyncBackupManifest } from './sync/restore.js';
 import { loadAgentRegistry } from './config/agents.js';
@@ -17,7 +17,6 @@ import { discoverAgents } from './agents/discovery.js';
 import { writeAgentDiscoveryReports } from './agents/reporter.js';
 import { openGovernanceDb } from './db/index.js';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -31,7 +30,7 @@ async function main() {
   const paths = createDefaultPaths(__dirname);
   const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
   const agentRegistry = await loadAgentRegistry(paths.agentConfigPath, DEFAULT_AGENTS);
-  const dbPath = join(paths.reportsDir, '..', 'data', 'governance.db');
+  const dbPath = resolveGovernanceDbPath(paths.reportsDir);
   const db = openGovernanceDb(dbPath);
   const output = await executeCommand(cli, {
     ...paths,

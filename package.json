@@ -1,6 +1,6 @@
 {
   "name": "mcpskills-center",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Unified MCP and skills management, audit, sync, and visualization platform for Claude Code, OpenCode, and Codex",
   "main": "dist/index.js",
   "bin": {
