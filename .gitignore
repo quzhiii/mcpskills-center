@@ -10,6 +10,9 @@ data/
 # Local git worktrees
 .worktrees/
 
+# Local session handoffs / continuation notes
+docs/handoffs/
+
 # Local Claude configuration
 .claude/
 

@@ -327,6 +327,7 @@ Fixture 策略：
 - `.claude/` 被视为本地机器配置，不作为 live repository payload 跟踪。
 - 仓库内可跟踪的 skill 样例放在 `fixtures/skills/`。
 - 这些 fixtures 是 synthetic 且保持最小化。
+- 项目自有的可复用 skill 放在 `skills/`，属于文档/配置资产，不作为 npm runtime payload 发布。
 
 ---
 
@@ -337,7 +338,7 @@ Fixture 策略：
 - 被动 HTTP / SSE 健康检查会校验配置里保留下来的 URL 或 host 值。
 - 主动健康检查验证的是 `--version` 级别的命令可达性，不是完整 MCP handshake。
 - OpenCode 的 array-form command 当前会归一化为前导可执行文件名用于 health probing。
-- 目前还没有 packaged binary，构建后通过 `node dist/index.js ...` 使用。
+- npm package 暴露 `mcpskills` 和 `mcpskills-center`；源码构建后仍支持 `node dist/index.js ...`。
 
 ---
 
@@ -348,6 +349,8 @@ Fixture 策略：
 | `docs/MCPskills-center-background-and-plan.md` | 产品背景、本机上下文与最初项目定位 |
 | `docs/migration-notes.md` | 迁移决策、保留内容与排除内容 |
 | `docs/plans/2026-06-03-mcpskills-center-completion.md` | 当前 CLI 工作流的实施计划 |
+| `docs/plans/` | 历史实施计划与里程碑执行记录 |
+| `skills/mcpskills-center/SKILL.md` | 安全使用 MCPskills Center 的本地可复用 skill 指南 |
 
 ---
 

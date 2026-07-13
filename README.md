@@ -327,6 +327,7 @@ Fixture policy:
 - `.claude/` is treated as local machine configuration and is not tracked as live repository payload.
 - Repository-tracked skill samples live under `fixtures/skills/`.
 - Those fixtures are synthetic and intentionally minimal.
+- Project-owned reusable skills live under `skills/` and are documentation/config assets, not npm runtime payload.
 
 ---
 
@@ -337,7 +338,7 @@ Fixture policy:
 - Passive HTTP and SSE health checks validate preserved URL or host values when present in config.
 - Active health checks validate command reachability through `--version`; they do not perform a full MCP handshake.
 - OpenCode array-form commands are normalized to the leading executable name for health probing.
-- There is no packaged binary yet; use `node dist/index.js ...` after build.
+- The npm package exposes `mcpskills` and `mcpskills-center`; source usage through `node dist/index.js ...` remains supported after build.
 
 ---
 
@@ -348,6 +349,8 @@ Fixture policy:
 | `docs/MCPskills-center-background-and-plan.md` | Product background, machine context, and original project framing |
 | `docs/migration-notes.md` | Migration decisions and retained / excluded assets |
 | `docs/plans/2026-06-03-mcpskills-center-completion.md` | Implementation plan for the completed CLI workflow |
+| `docs/plans/` | Historical implementation plans and milestone execution notes |
+| `skills/mcpskills-center/SKILL.md` | Reusable local skill guidance for operating MCPskills Center safely |
 
 ---
 
