@@ -4,7 +4,8 @@
 
 **Local-first CLI for scanning, auditing, planning, and synchronizing agent skills while inventorying MCP servers across Claude Code, OpenCode, Codex, CodeBuddy, WorkBuddy, Trae, Qoder, and Qoder Work.**
 
-[![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Runtime](https://img.shields.io/badge/runtime-Node.js%2020%20%7C%2022--26-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/quzhiii/mcpskills-center/actions/workflows/ci.yml/badge.svg)](https://github.com/quzhiii/mcpskills-center/actions/workflows/ci.yml)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Mode](https://img.shields.io/badge/mode-local--first-6f42c1)](#safety-model)
 [![Default](https://img.shields.io/badge/default-read--only-success)](#safety-model)
@@ -65,6 +66,8 @@ Longer-term layers are a local Web control plane over the CLI kernel, then intel
 ## Quickstart
 
 Clone the repository, install dependencies, run the test suite, then generate the first inventory snapshot.
+
+Use Node.js 20 or Node.js 22-26. Node.js 22 or 24 LTS is recommended.
 
 ```bash
 git clone https://github.com/quzhiii/mcpskills-center.git

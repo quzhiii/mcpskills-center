@@ -4,7 +4,8 @@
 
 **面向 Claude Code、OpenCode、Codex、CodeBuddy、WorkBuddy、Trae、Qoder、Qoder Work 的本地优先 CLI，用来扫描、审计、规划 agent skills 同步，并盘点 MCP server。**
 
-[![Runtime](https://img.shields.io/badge/runtime-Node.js-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Runtime](https://img.shields.io/badge/runtime-Node.js%2020%20%7C%2022--26-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/quzhiii/mcpskills-center/actions/workflows/ci.yml/badge.svg)](https://github.com/quzhiii/mcpskills-center/actions/workflows/ci.yml)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Mode](https://img.shields.io/badge/mode-local--first-6f42c1)](#安全模型)
 [![Default](https://img.shields.io/badge/default-read--only-success)](#安全模型)
@@ -65,6 +66,8 @@ MCP governance 已进入只读 / report-first 主线。只读 MCP kernel 已完�
 ## 快速开始
 
 克隆仓库、安装依赖、跑测试，然后生成第一份本机 inventory。
+
+请使用 Node.js 20 或 Node.js 22-26，推荐使用 Node.js 22 或 24 LTS。
 
 ```bash
 git clone https://github.com/quzhiii/mcpskills-center.git
