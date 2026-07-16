@@ -21,13 +21,14 @@ test('loadSyncConfig reads approved sync roots from config file', async () => {
   const root = await makeTempRoot();
   const configDir = join(root, 'config');
   const configPath = join(configDir, 'sync.json');
+  const approvedSyncRoots = [join(root, 'custom', 'canonical'), join(root, 'custom', 'agent')];
 
   await mkdir(configDir, { recursive: true });
-  await writeFile(configPath, JSON.stringify({ approvedSyncRoots: ['C:/custom/canonical', 'C:/custom/agent'] }, null, 2), 'utf-8');
+  await writeFile(configPath, JSON.stringify({ approvedSyncRoots }, null, 2), 'utf-8');
 
   const config = await loadSyncConfig(configPath, ['C:/default']);
 
-  assert.deepEqual(config.approvedSyncRoots, ['C:/custom/canonical', 'C:/custom/agent']);
+  assert.deepEqual(config.approvedSyncRoots, approvedSyncRoots);
 });
 
 test('loadSyncConfig resolves relative approved roots from project root', async () => {
