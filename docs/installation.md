@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18 or later
+- Node.js 20 or Node.js 22-26 (Node.js 22 or 24 LTS recommended)
 - npm 9 or later
 
 ## Install from source
