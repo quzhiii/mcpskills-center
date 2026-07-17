@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { parseJsonConfig } from '../config/parse.js';
 import { asRecord, detectTransport, extractCommand, checkSensitiveEnv } from '../mcp/adapters/shared.js';
 import type { MCPServer } from '../types/index.js';
+import { isMissingPathError } from './errors.js';
 
 export async function scanJsonMcpServers(
   agentName: string,
@@ -32,7 +33,9 @@ export async function scanJsonMcpServers(
       } satisfies MCPServer;
     });
   } catch (err) {
-    console.warn(`Warning: Could not read ${warningLabel} MCP config: ${mcpConfigFile}`, (err as Error).message);
+    if (!isMissingPathError(err)) {
+      console.warn(`Warning: Could not read ${warningLabel} MCP config: ${mcpConfigFile}`, (err as Error).message);
+    }
     return [];
   }
 }

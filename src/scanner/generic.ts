@@ -3,6 +3,7 @@ import { lstat, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BaseScanner } from './base.js';
 import type { MCPServer, Skill } from '../types/index.js';
+import { isMissingPathError } from './errors.js';
 
 export class GenericScanner extends BaseScanner {
   async scanSkills(): Promise<Skill[]> {
@@ -49,7 +50,9 @@ export class GenericScanner extends BaseScanner {
         });
       }
     } catch (err) {
-      console.warn(`Warning: Could not read generic skills dir: ${skillsDir}`, (err as Error).message);
+      if (!isMissingPathError(err)) {
+        console.warn(`Warning: Could not read generic skills dir: ${skillsDir}`, (err as Error).message);
+      }
     }
 
     return skills;

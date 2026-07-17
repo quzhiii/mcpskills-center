@@ -66,6 +66,33 @@ test('loadSyncConfig rejects invalid approved sync roots', async () => {
 
   await assert.rejects(
     () => loadSyncConfig(configPath, ['C:/default']),
-    /Sync config approvedSyncRoots must be an array of strings/
+    /Sync config approvedSyncRoots must be an array of non-empty strings/
   );
+});
+
+test('loadSyncConfig expands home paths and removes duplicate roots', async () => {
+  const root = await makeTempRoot();
+  const configDir = join(root, 'config');
+  const configPath = join(configDir, 'sync.json');
+  const homeDir = join(root, 'home');
+  await mkdir(configDir, { recursive: true });
+  await writeFile(configPath, JSON.stringify({
+    approvedSyncRoots: ['~/.claude/skills', '~/.claude/skills', '../canonical-skills'],
+  }));
+
+  const config = await loadSyncConfig(configPath, [], { baseDir: configDir, homeDir });
+
+  assert.deepEqual(config.approvedSyncRoots, [
+    join(homeDir, '.claude', 'skills'),
+    resolve(configDir, '../canonical-skills'),
+  ]);
+});
+
+test('loadSyncConfig rejects empty approved roots', async () => {
+  const root = await makeTempRoot();
+  const configPath = join(root, 'config', 'sync.json');
+  await mkdir(join(root, 'config'), { recursive: true });
+  await writeFile(configPath, JSON.stringify({ approvedSyncRoots: ['  '] }));
+
+  await assert.rejects(() => loadSyncConfig(configPath, []), /non-empty strings/);
 });

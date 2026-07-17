@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ClaudeCodeScanner } from './claude-code.js';
-import { createTempAgentRoot, withSuppressedConsoleWarn } from './test-utils.js';
+import { createTempAgentRoot } from './test-utils.js';
 import type { AgentConfig, MCPServer, McpAdapterScope } from '../types/index.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -70,9 +70,37 @@ test('Claude Code MCP scanner returns no servers for missing config file', async
     mcpConfigFile: join(fixture.root, 'missing.json'),
   };
 
-  const servers = await withSuppressedConsoleWarn(() => new ClaudeCodeScanner(config).scanMCP());
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+  let servers;
+  try {
+    servers = await new ClaudeCodeScanner(config).scanMCP();
+  } finally {
+    console.warn = originalWarn;
+  }
 
   assert.deepEqual(servers, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('Claude Code MCP scanner warns for malformed existing config', async () => {
+  const fixture = await createTempAgentRoot('mcpskills-claude-invalid-');
+  cleanups.push(fixture.cleanup);
+  const mcpConfigFile = join(fixture.root, 'invalid.json');
+  await writeFile(mcpConfigFile, '{invalid');
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+  try {
+    await new ClaudeCodeScanner({
+      name: 'claude-code', configDir: fixture.root, skillsDir: fixture.skillsDir, mcpConfigFile,
+    }).scanMCP();
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
 });
 
 function firstDefinitionScope(server: MCPServer | undefined): McpAdapterScope | undefined {

@@ -22,11 +22,20 @@ interface RawAgentRegistry {
   agents?: unknown;
 }
 
-export async function loadAgentRegistry(configPath: string, defaultAgents: AgentConfig[]): Promise<AgentRegistry> {
+export interface AgentConfigPathOptions {
+  baseDir?: string;
+  homeDir?: string;
+}
+
+export async function loadAgentRegistry(
+  configPath: string,
+  defaultAgents: AgentConfig[],
+  options: AgentConfigPathOptions = {},
+): Promise<AgentRegistry> {
   try {
     const parsed = parseJsonConfig<RawAgentRegistry>(await readFile(configPath, 'utf-8'));
-    const projectRoot = dirname(dirname(configPath));
-    return validateAgentRegistry(parsed, projectRoot);
+    const baseDir = options.baseDir ?? dirname(dirname(configPath));
+    return validateAgentRegistry(parsed, baseDir, options.homeDir ?? homedir());
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       return { agents: defaultAgents };
@@ -36,22 +45,29 @@ export async function loadAgentRegistry(configPath: string, defaultAgents: Agent
   }
 }
 
-function validateAgentRegistry(value: RawAgentRegistry, projectRoot: string): AgentRegistry {
+function validateAgentRegistry(value: RawAgentRegistry, baseDir: string, homeDir: string): AgentRegistry {
   if (!Array.isArray(value.agents)) {
     throw new Error('Agent registry agents must be an array');
   }
 
-  return {
-    agents: value.agents
-      .map(agent => validateAgentConfig(agent as RawAgentConfig, projectRoot))
-      .filter(agent => agent.enabled !== false),
-  };
+  const agents = value.agents.map(agent => validateAgentConfig(agent as RawAgentConfig, baseDir, homeDir));
+  const ids = new Set<string>();
+  for (const agent of agents) {
+    if (ids.has(agent.id ?? agent.name)) {
+      throw new Error(`Agent registry contains duplicate agent id: ${agent.id ?? agent.name}`);
+    }
+    ids.add(agent.id ?? agent.name);
+  }
+
+  return { agents: agents.filter(agent => agent.enabled !== false) };
 }
 
-function validateAgentConfig(value: RawAgentConfig, projectRoot: string): AgentConfig {
+function validateAgentConfig(value: RawAgentConfig, baseDir: string, homeDir: string): AgentConfig {
   if (
     typeof value.id !== 'string' ||
+    value.id.trim().length === 0 ||
     typeof value.scannerType !== 'string' ||
+    value.scannerType.trim().length === 0 ||
     typeof value.configDir !== 'string' ||
     typeof value.skillsDir !== 'string'
   ) {
@@ -66,18 +82,18 @@ function validateAgentConfig(value: RawAgentConfig, projectRoot: string): AgentC
     scannerType: value.scannerType,
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
     readOnly: typeof value.readOnly === 'boolean' ? value.readOnly : true,
-    configDir: resolveConfigPath(value.configDir, projectRoot),
-    skillsDir: resolveConfigPath(value.skillsDir, projectRoot),
-    mcpConfigFile: typeof value.mcpConfigFile === 'string' ? resolveConfigPath(value.mcpConfigFile, projectRoot) : undefined,
-    pluginsDir: typeof value.pluginsDir === 'string' ? resolveConfigPath(value.pluginsDir, projectRoot) : undefined,
+    configDir: resolveConfigPath(value.configDir, baseDir, homeDir),
+    skillsDir: resolveConfigPath(value.skillsDir, baseDir, homeDir),
+    mcpConfigFile: typeof value.mcpConfigFile === 'string' ? resolveConfigPath(value.mcpConfigFile, baseDir, homeDir) : undefined,
+    pluginsDir: typeof value.pluginsDir === 'string' ? resolveConfigPath(value.pluginsDir, baseDir, homeDir) : undefined,
   };
 }
 
-function resolveConfigPath(value: string, projectRoot: string): string {
-  if (value === '~') return homedir();
+function resolveConfigPath(value: string, baseDir: string, homeDir: string): string {
+  if (value === '~') return homeDir;
   if (value.startsWith('~/') || value.startsWith('~\\')) {
-    return resolve(homedir(), value.slice(2));
+    return resolve(homeDir, value.slice(2));
   }
 
-  return isAbsolute(value) ? value : resolve(projectRoot, value);
+  return isAbsolute(value) ? value : resolve(baseDir, value);
 }

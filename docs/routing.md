@@ -8,7 +8,7 @@ MCPskills Center includes a task routing system that recommends which agent shou
 
 Agent routing takes a natural-language task description and recommends the best agent to handle it. It uses:
 
-1. **Task categories** defined in `config/routing-policy.json`
+1. **Task categories** defined in the effective `routing-policy.json`
 2. **Keyword matching** against the task description
 3. **Eligible agents** per category
 4. **Fallback ordering** when no category matches
@@ -19,7 +19,7 @@ Agent routing takes a natural-language task description and recommends the best 
 
 The routing process:
 
-1. Load `config/routing-policy.json`
+1. Load the effective `routing-policy.json`
 2. Lowercase the task description
 3. Check each category's `keywords` array for a substring match
 4. Return the first matching category's `preferredAgent`
@@ -49,7 +49,7 @@ Task: "do something completely unrelated"
 
 ## Routing Policy Schema
 
-The policy file is at `config/routing-policy.json`:
+The bundled default is `config/routing-policy.json`. Run `mcpskills config path` to find the effective file; after initialization it is under `<user-data-root>/config/`.
 
 ```json
 {
@@ -100,7 +100,7 @@ The policy file is at `config/routing-policy.json`:
 
 ## Customizing Routing Policy
 
-Edit `config/routing-policy.json` to add or modify categories.
+Run `mcpskills init`, then edit the user `routing-policy.json` shown by `mcpskills config path`.
 
 ### Adding a new category
 
@@ -142,7 +142,7 @@ An agent is eligible for a task if:
 
 1. The task matches a category
 2. The agent is listed in that category's `eligibleAgents`
-3. The agent is registered and enabled in `config/agents.json`
+3. The agent is registered and enabled in the effective `agents.json`
 
 The `requiredCapabilities` field is reserved for future use when capability-based filtering is implemented.
 

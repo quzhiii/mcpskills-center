@@ -1,7 +1,5 @@
 import { join } from 'node:path';
 import { copyFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import process from 'node:process';
 import { describeAgentSupport } from '../agents/support.js';
 import { runAudit } from '../auditor/index.js';
 import { evaluateMcpHealth, runActiveMcpHealth } from '../health/mcp.js';
@@ -31,6 +29,7 @@ export interface CommandContext {
   canonicalSkillsDir: string;
   backupsDir: string;
   profilesDir: string;
+  routingPolicyPath?: string;
   syncConfigPath: string;
   agentConfigPath: string;
   approvedSyncRoots: string[];
@@ -48,31 +47,6 @@ export interface CommandContext {
   applyMcpPlan?: typeof applyMcpPlan;
   restoreMcpBackupManifest?: typeof restoreMcpBackupManifest;
   db?: Database.Database;
-}
-
-export interface RuntimePathEnv {
-  platform: NodeJS.Platform;
-  homeDir: string;
-  appData?: string;
-  xdgDataHome?: string;
-}
-
-export function resolveUserDataRoot(env: RuntimePathEnv): string {
-  if (env.platform === 'win32') {
-    return env.appData
-      ? join(env.appData, 'mcpskills-center')
-      : join(env.homeDir, 'AppData', 'Roaming', 'mcpskills-center');
-  }
-
-  if (env.platform === 'darwin') {
-    return join(env.homeDir, 'Library', 'Application Support', 'mcpskills-center');
-  }
-
-  return join(env.xdgDataHome ?? join(env.homeDir, '.local', 'share'), 'mcpskills-center');
-}
-
-export function resolveGovernanceDbPath(reportsDir: string): string {
-  return join(reportsDir, '..', 'data', 'governance.db');
 }
 
 export async function executeCommand(cli: CliArgs, context: CommandContext): Promise<string> {
@@ -103,6 +77,10 @@ export async function executeCommand(cli: CliArgs, context: CommandContext): Pro
       return executeRoute(cli, context);
     case 'web':
       return executeWeb(cli, context);
+    case 'init':
+    case 'config':
+    case 'doctor':
+      throw new Error(`${cli.command} must be handled before governance services are initialized`);
     case 'help':
       return renderHelp();
   }
@@ -115,6 +93,10 @@ export function renderHelp(): string {
     'Usage: mcpskills <command> [options]',
     '',
     'Quick Start:',
+    '  mcpskills init --dry-run                Preview user configuration setup',
+    '  mcpskills init                          Create missing user configuration',
+    '  mcpskills config validate               Validate effective configuration',
+    '  mcpskills doctor                        Diagnose local setup (read-only)',
     '  mcpskills scan                          Scan inventory and generate reports',
     '  mcpskills governance --dry-run          Unified skills + MCP governance plan',
     '  mcpskills route "fix this bug"          Recommend which agent to use',
@@ -137,6 +119,9 @@ export function renderHelp(): string {
     '  mcpskills history                       View operation history',
     '',
     'Inspection:',
+    '  mcpskills config path                   Show effective configuration sources',
+    '  mcpskills config validate               Validate all configuration surfaces',
+    '  mcpskills doctor                        Diagnose runtime, storage, and agents',
     '  mcpskills audit                         Print audit summary',
     '  mcpskills agents list                   List registered agents',
     '  mcpskills agents discover               Discover agent candidates',
@@ -156,6 +141,7 @@ export function renderHelp(): string {
     'Options:',
     '  --dry-run                               Plan without writing',
     '  --apply                                 Execute the plan',
+    '  --force                                 Overwrite known files during init',
     '  --confirm                               Required for apply',
     '  --restore <manifest>                    Restore from manifest',
     '  --canonical-dir <path>                  Custom canonical skills dir',
@@ -687,7 +673,7 @@ async function executeRoute(cli: CliArgs, context: CommandContext): Promise<stri
     return 'Usage: node dist/index.js route <task-description>';
   }
 
-  const policyPath = join(context.profilesDir, '..', 'routing-policy.json');
+  const policyPath = context.routingPolicyPath ?? join(context.profilesDir, '..', 'routing-policy.json');
   const agents = await context.listAgents();
   const result = await routeTask(taskDescription, policyPath, agents, context.db);
 
@@ -778,31 +764,4 @@ export async function snapshotCurrentPlansAsPrevious(reportsDir: string): Promis
       // No previous plan to snapshot
     }
   }
-}
-
-export function createDefaultPaths(
-  dirname: string,
-  runtimeEnv: RuntimePathEnv = {
-    platform: process.platform,
-    homeDir: homedir(),
-    appData: process.env.APPDATA,
-    xdgDataHome: process.env.XDG_DATA_HOME,
-  },
-): Pick<CommandContext, 'reportsDir' | 'canonicalSkillsDir' | 'backupsDir' | 'profilesDir' | 'syncConfigPath' | 'agentConfigPath' | 'approvedSyncRoots'> {
-  const home = runtimeEnv.homeDir;
-  const userDataRoot = resolveUserDataRoot(runtimeEnv);
-  return {
-    reportsDir: join(userDataRoot, 'reports'),
-    canonicalSkillsDir: join(dirname, '..', 'config', 'canonical-skills'),
-    backupsDir: join(userDataRoot, 'backups'),
-    profilesDir: join(dirname, '..', 'config', 'profiles'),
-    syncConfigPath: join(dirname, '..', 'config', 'sync.json'),
-    agentConfigPath: join(dirname, '..', 'config', 'agents.json'),
-    approvedSyncRoots: [
-      join(dirname, '..', 'config', 'canonical-skills'),
-      join(home, '.claude', 'skills'),
-      join(home, '.opencode', 'skills'),
-      join(home, '.codex', 'skills'),
-    ],
-  };
 }

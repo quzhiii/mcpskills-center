@@ -2,18 +2,54 @@
 
 Detailed reference for every MCPskills Center CLI command.
 
+Unless an absolute path is shown, `reports/` and `backups/` below are subdirectories of the platform user data root displayed by `mcpskills config path`.
+
 ## Global Options
 
 | Flag | Description |
 |---|---|
 | `--dry-run` | Plan without writing any files |
 | `--apply` | Execute the plan |
+| `--force` | Overwrite known user config files during `init` |
 | `--confirm` | Required to actually apply changes |
 | `--restore <manifest>` | Restore from a backup manifest |
 | `--canonical-dir <path>` | Custom canonical skills directory |
 | `--active` | Enable active health probes |
 | `--allow-command <cmd>` | Allowlist a command for active probes |
 | `--timeout <ms>` | Probe timeout in milliseconds (default: 3000) |
+
+---
+
+## init
+
+Create missing editable configuration under the platform user data root.
+
+```bash
+mcpskills init --dry-run
+mcpskills init
+mcpskills init --force --confirm
+```
+
+The default mode skips existing files. Forced overwrite requires `--confirm` and preserves unknown files in the profiles directory.
+
+## config
+
+```bash
+mcpskills config path
+mcpskills config validate
+```
+
+`config path` shows user candidates and effective `user`, `bundled`, or `default` sources. `config validate` aggregates agents, sync, profiles, scanner, and routing diagnostics without displaying configuration contents or secret values. Neither command opens SQLite or creates runtime directories.
+
+## doctor
+
+```bash
+mcpskills doctor
+```
+
+Runs read-only Node, configuration, storage, scanner, and optional Agent checks. It does not open SQLite, generate reports, create probe files, spawn Agent/MCP processes, or use the network. A missing optional Agent is reported as `SKIPPED`; malformed config and inaccessible declared paths are errors.
+
+Warnings and skipped optional Agents do not fail the command. Any `ERROR` diagnostic produces a non-zero exit code.
 
 ---
 

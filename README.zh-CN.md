@@ -47,6 +47,8 @@ Qoder / Qoder Work ────────────┘                      
 | 安全 apply / restore | 显式 `--confirm`、approved roots 校验、时间戳备份、restore manifest |
 | Profiles | 以 `coding`、`research` 等场景包做只读规划 |
 | Health 检查 | 默认被动检查，显式 allowlist 后才做主动命令探测 |
+| 用户配置 | 每用户可编辑配置、包内只读默认值和安全初始化 |
+| Doctor | 只读诊断 runtime、配置、存储和 Agent 状态 |
 | Dashboard | 生成 `reports/dashboard.html` 静态离线页面 |
 
 各 agent 当前支持状态可见 `docs/supported-agents.zh-CN.md`。
@@ -65,7 +67,7 @@ MCP governance 已进入只读 / report-first 主线。只读 MCP kernel 已完�
 
 ## 快速开始
 
-克隆仓库、安装依赖、跑测试，然后生成第一份本机 inventory。
+克隆仓库、安装依赖、初始化用户配置，然后生成第一份本机 inventory。
 
 请使用 Node.js 20 或 Node.js 22-26，推荐使用 Node.js 22 或 24 LTS。
 
@@ -75,6 +77,10 @@ cd mcpskills-center
 
 npm install
 npm test
+npm run build
+node dist/index.js init
+node dist/index.js config validate
+node dist/index.js doctor
 npm run scan
 ```
 
@@ -82,8 +88,9 @@ npm run scan
 
 - TypeScript 成功构建到 `dist/`
 - 测试全部通过
-- `reports/` 下生成报告
-- `reports/dashboard.html` 可以本地直接打开，无需外部静态资源
+- 用户配置创建在平台用户数据根目录下
+- 报告生成在 `<user-data-root>/reports/`
+- `<user-data-root>/reports/dashboard.html` 可以本地直接打开，无需外部静态资源
 
 如果想继续看只读同步计划：
 
@@ -94,6 +101,14 @@ node dist/index.js sync --dry-run
 ---
 
 ## 输出物
+
+可写状态不会进入 npm package 目录：
+
+| 平台 | 用户数据根目录 |
+|---|---|
+| Windows | `%APPDATA%\mcpskills-center\` |
+| macOS | `~/Library/Application Support/mcpskills-center/` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/mcpskills-center/` |
 
 ### 主要报告
 
@@ -114,7 +129,7 @@ node dist/index.js sync --dry-run
 - `reports/capability-matrix-current.json`
 - `reports/capability-matrix-current.md`
 
-`sync --apply --confirm` 会在 `backups/` 下写入带时间戳的备份目录，并生成一次 apply 对应的 consolidated manifest。
+`sync --apply --confirm` 会在 `<user-data-root>/backups/` 下写入带时间戳的备份目录，并生成一次 apply 对应的 consolidated manifest。
 
 ### Dashboard 预览
 
@@ -134,6 +149,10 @@ HTML 页面更适合阅读。JSON 与 Markdown 报告仍然是可审计、可自
 
 | 命令 | 作用 | 写入位置 |
 |---|---|---|
+| `mcpskills init [--dry-run]` | 创建缺失用户配置，默认不覆盖已有文件 | 仅用户配置 |
+| `mcpskills config path` | 显示候选路径、有效路径和来源 | 无 |
+| `mcpskills config validate` | 验证 agents、sync、profiles 和 routing 配置 | 无 |
+| `mcpskills doctor` | 诊断 Node、配置、存储、scanner 和可选 Agent | 无 |
 | `npm run scan` | 扫描 inventory、归一化记录、执行审计并生成报告 | `reports/` |
 | `npm run audit` | 在终端打印审计摘要 | 无 |
 | `node dist/index.js sync --dry-run` | 生成同步计划，不改动 agent 配置 | `reports/` |
@@ -254,7 +273,7 @@ node dist/index.js health --active --allow-command npx --timeout 3000
 
 ## Profiles
 
-示例 profiles 位于 `config/profiles/`，全部以只读方式和当前 inventory 做对比。
+示例 profiles 随包位于 `config/profiles/`。执行 `mcpskills init` 后，可编辑副本位于 `<user-data-root>/config/profiles/`，并以只读方式和当前 inventory 做对比。
 
 | Profile | 作用 | Agents |
 |---|---|---|
@@ -275,20 +294,39 @@ node dist/index.js profile plan coding
 
 ## Sync Approval Config
 
-可写的同步根目录由 `config/sync.json` 控制。
+可写同步根目录由有效的 `sync.json` 控制。使用 `mcpskills config path` 查看实际位置。
 
 ```json
 {
   "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
+    "../canonical-skills",
+    "~/.claude/skills",
+    "~/.opencode/skills",
+    "~/.codex/skills"
   ]
 }
 ```
 
-相对路径会按项目根目录解析。配置值非法时，apply 开始前就会失败。
+相对路径按有效 `sync.json` 所在目录解析，`~` 使用当前 home 目录。配置值非法时，apply 开始前就会失败。
+
+## 用户配置
+
+`mcpskills init` 将包内默认值复制到 `<user-data-root>/config/`。已有文件默认跳过。覆盖已知 MCPskills Center 文件必须同时使用 `--force` 和 `--confirm`，未知 profile 文件不会删除。
+
+每个配置面都整体选择来源：用户文件/目录存在时使用用户来源；缺失时才使用包内默认值（sync 使用生成的默认值）。用户配置损坏会直接验证失败，不会静默回退。
+
+```text
+<user-data-root>/
+├── config/
+│   ├── agents.json
+│   ├── sync.json
+│   ├── routing-policy.json
+│   └── profiles/
+├── canonical-skills/
+├── reports/
+├── backups/
+└── data/governance.db
+```
 
 ---
 
@@ -318,8 +356,6 @@ mcpskills-center/
 │   └── sync.json
 ├── docs/
 ├── fixtures/
-├── reports/
-├── backups/
 ├── src/
 ├── README.md
 └── README.zh-CN.md
@@ -336,8 +372,9 @@ Fixture 策略：
 
 ## 边界与限制
 
-- 当前示例 `config/sync.json` 偏向单机使用，换机器后通常需要调整。
-- Profile 匹配支持把 `playwright` 这类 short MCP id 匹配到 `C:/Users/quzhi:playwright` 这类 project-scoped id。
+- 包内 `config/` 是只读模板/默认来源，应编辑用户配置而不是包内文件。
+- 当前仓库是 0.3.0 源码里程碑，尚未发布 npm；npm `latest` 仍是 0.2.2。
+- Profile 匹配支持把 `playwright` 这类 short MCP id 匹配到 `<project-path>:playwright` 这类 project-scoped id。
 - 被动 HTTP / SSE 健康检查会校验配置里保留下来的 URL 或 host 值。
 - 主动健康检查验证的是 `--version` 级别的命令可达性，不是完整 MCP handshake。
 - OpenCode 的 array-form command 当前会归一化为前导可执行文件名用于 health probing。

@@ -1,8 +1,9 @@
-export type CliCommand = 'scan' | 'audit' | 'sync' | 'profile' | 'agents' | 'mcp' | 'matrix' | 'health' | 'governance' | 'governance-diff' | 'history' | 'route' | 'web' | 'help';
+export type CliCommand = 'scan' | 'audit' | 'sync' | 'profile' | 'agents' | 'mcp' | 'matrix' | 'health' | 'governance' | 'governance-diff' | 'history' | 'route' | 'web' | 'init' | 'config' | 'doctor' | 'help';
 
 export interface CliOptions {
   dryRun: boolean;
   apply: boolean;
+  force: boolean;
   confirm: boolean;
   canonicalDir?: string;
   restoreManifestPath?: string;
@@ -22,6 +23,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let command: CliCommand = 'scan';
   let dryRun = false;
   let apply = false;
+  let force = false;
   let confirm = false;
   let canonicalDir: string | undefined;
   let restoreManifestPath: string | undefined;
@@ -37,7 +39,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     command = isCliCommand(candidate) ? candidate : 'help';
   }
 
-  if (command === 'profile' || command === 'agents' || command === 'mcp') {
+  if (command === 'profile' || command === 'agents' || command === 'mcp' || command === 'config') {
     subcommand = args.shift();
     profileName = args[0] && !args[0].startsWith('--') ? args.shift() : undefined;
   }
@@ -62,6 +64,9 @@ export function parseCliArgs(argv: string[]): CliArgs {
         break;
       case '--apply':
         apply = true;
+        break;
+      case '--force':
+        force = true;
         break;
       case '--confirm':
         confirm = true;
@@ -90,6 +95,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     options: {
       dryRun,
       apply,
+      force,
       confirm,
       canonicalDir,
       restoreManifestPath,
@@ -105,5 +111,6 @@ export function parseCliArgs(argv: string[]): CliArgs {
 function isCliCommand(value: string): value is CliCommand {
   return value === 'scan' || value === 'audit' || value === 'sync' || value === 'profile'
       || value === 'agents' || value === 'mcp' || value === 'matrix' || value === 'health'
-      || value === 'governance' || value === 'governance-diff' || value === 'history' || value === 'route' || value === 'web' || value === 'help';
+      || value === 'governance' || value === 'governance-diff' || value === 'history' || value === 'route' || value === 'web'
+      || value === 'init' || value === 'config' || value === 'doctor' || value === 'help';
 }

@@ -149,7 +149,7 @@ When `--apply` runs:
   "entries": [
     {
       "actionId": "copy:debug-pro",
-      "targetPath": "C:/Users/quzhi/.claude/skills/debug-pro",
+      "targetPath": "<home>/.claude/skills/debug-pro",
       "backupPath": "backups/debug-pro-2026-06-10T12-00-00"
     }
   ]
@@ -170,22 +170,22 @@ Restore copies backed-up content from the manifest back to the original target p
 
 ## Approved Roots
 
-Writable paths are controlled by `config/sync.json`:
+Writable paths are controlled by the effective `sync.json` shown by `mcpskills config path`:
 
 ```json
 {
   "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
+    "../canonical-skills",
+    "~/.claude/skills",
+    "~/.opencode/skills",
+    "~/.codex/skills"
   ]
 }
 ```
 
 **Rules:**
 
-- Relative paths resolve from the project root
+- Relative paths resolve from the effective config file directory; `~` uses the current home directory
 - Apply and restore validate both source and target paths against approved roots
 - Paths outside approved roots are rejected before any writes
 - Invalid values fail before an apply run begins

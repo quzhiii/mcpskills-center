@@ -17,6 +17,9 @@ npm run build
 Then use:
 
 ```bash
+node dist/index.js init
+node dist/index.js config validate
+node dist/index.js doctor
 node dist/index.js scan
 node dist/index.js governance --dry-run
 ```
@@ -30,6 +33,9 @@ npm install -g mcpskills-center
 Then use directly:
 
 ```bash
+mcpskills init
+mcpskills config validate
+mcpskills doctor
 mcpskills scan
 mcpskills governance --dry-run
 mcpskills route "fix this bug"
@@ -45,8 +51,26 @@ npx mcpskills-center scan
 
 ```bash
 mcpskills help
+mcpskills init --dry-run
+mcpskills config path
+mcpskills config validate
+mcpskills doctor
 mcpskills scan
 ```
+
+## User configuration and data
+
+MCPskills Center keeps writable state outside the installed npm package:
+
+| Platform | User data root |
+|---|---|
+| Windows | `%APPDATA%\mcpskills-center\` |
+| macOS | `~/Library/Application Support/mcpskills-center/` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/mcpskills-center/` |
+
+`mcpskills init` creates editable config under `<user-data-root>/config/` and skips existing files. `mcpskills init --force --confirm` overwrites only known MCPskills Center config files. Reports, backups, canonical skills, and SQLite data use sibling directories under the same root.
+
+The repository currently contains the 0.3.0 source milestone. It has not been published to npm; npm `latest` remains 0.2.2.
 
 If `mcpskills` is not found after global install, check that your npm global bin directory is in your PATH:
 

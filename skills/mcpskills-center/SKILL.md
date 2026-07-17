@@ -124,6 +124,8 @@ npx mcpskills-center help
 
 常见子目录：
 
+- `config/`：可编辑用户配置；包内 `config/` 仅作为只读默认模板
+- `canonical-skills/`：canonical skill store
 - `reports/`：JSON / Markdown / HTML 报告
 - `backups/`：apply 前备份和 manifest
 - `data/`：SQLite 历史数据，例如 `governance.db`
@@ -159,6 +161,10 @@ node dist/index.js scan
 
 | 目标 | 命令 |
 |---|---|
+| 初始化缺失用户配置 | `mcpskills init` |
+| 查看有效配置来源 | `mcpskills config path` |
+| 验证用户配置 | `mcpskills config validate` |
+| 只读诊断本机环境 | `mcpskills doctor` |
 | 扫描本机 inventory | `mcpskills scan` |
 | 打印审计摘要 | `mcpskills audit` |
 | 生成 skill 同步 dry-run | `mcpskills sync --dry-run` |

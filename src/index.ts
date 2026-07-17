@@ -8,7 +8,11 @@ import { writeMcpGovernancePlanReports } from './mcp/reporter.js';
 import { applyMcpPlan } from './mcp/apply.js';
 import { restoreMcpBackupManifest } from './mcp/restore.js';
 import { loadProfiles } from './profiles/loader.js';
-import { createDefaultPaths, executeCommand, resolveGovernanceDbPath } from './cli/commands.js';
+import { executeCommand } from './cli/commands.js';
+import { createDefaultPaths } from './config/paths.js';
+import { executeSetupCommand } from './cli/setup-commands.js';
+import { resolveEffectiveConfigPaths } from './config/user-config.js';
+import { dirname } from 'node:path';
 import { loadSyncConfig } from './config/sync.js';
 import { restoreSyncBackupManifest } from './sync/restore.js';
 import { loadAgentRegistry } from './config/agents.js';
@@ -28,12 +32,31 @@ async function main() {
   }
   const cli = parseCliArgs(process.argv.slice(2));
   const paths = createDefaultPaths(__dirname);
-  const syncConfig = await loadSyncConfig(paths.syncConfigPath, paths.approvedSyncRoots);
-  const agentRegistry = await loadAgentRegistry(paths.agentConfigPath, DEFAULT_AGENTS);
-  const dbPath = resolveGovernanceDbPath(paths.reportsDir);
-  const db = openGovernanceDb(dbPath);
+  const setupOutput = await executeSetupCommand(cli, paths);
+  if (setupOutput !== null) {
+    console.log(setupOutput);
+    return;
+  }
+  const effective = await resolveEffectiveConfigPaths(paths);
+  const syncConfigPath = effective.sync.path ?? paths.userSyncConfigPath;
+  const agentConfigPath = effective.agents.path ?? paths.userAgentConfigPath;
+  const syncConfig = await loadSyncConfig(syncConfigPath, paths.approvedSyncRoots, {
+    baseDir: dirname(syncConfigPath),
+    homeDir: paths.homeDir,
+  });
+  const agentRegistry = await loadAgentRegistry(agentConfigPath, DEFAULT_AGENTS, {
+    baseDir: dirname(agentConfigPath),
+    homeDir: paths.homeDir,
+  });
+  const db = openGovernanceDb(paths.governanceDbPath);
   const output = await executeCommand(cli, {
-    ...paths,
+    reportsDir: paths.reportsDir,
+    canonicalSkillsDir: paths.canonicalSkillsDir,
+    backupsDir: paths.backupsDir,
+    profilesDir: effective.profiles.path,
+    routingPolicyPath: effective.routingPolicy.path,
+    syncConfigPath,
+    agentConfigPath,
     approvedSyncRoots: syncConfig.approvedSyncRoots,
     runInventory: () => runInventory(agentRegistry.agents),
     writeAllReports,
