@@ -116,3 +116,38 @@ test('loadAgentRegistry rejects invalid agents config', async () => {
     /Agent registry entry must include id, scannerType, configDir, and skillsDir/
   );
 });
+
+test('loadAgentRegistry expands home paths with the injected home directory', async () => {
+  const root = await makeTempRoot();
+  const configPath = join(root, 'config', 'agents.json');
+  await mkdir(join(root, 'config'), { recursive: true });
+  await writeFile(configPath, JSON.stringify({
+    agents: [{
+      id: 'custom',
+      scannerType: 'generic',
+      configDir: '~/.custom',
+      skillsDir: '~/.custom/skills',
+    }],
+  }));
+
+  const registry = await loadAgentRegistry(configPath, [], {
+    baseDir: root,
+    homeDir: join(root, 'injected-home'),
+  });
+
+  assert.equal(registry.agents[0].configDir, join(root, 'injected-home', '.custom'));
+});
+
+test('loadAgentRegistry rejects empty and duplicate agent ids', async () => {
+  const root = await makeTempRoot();
+  const configPath = join(root, 'config', 'agents.json');
+  await mkdir(join(root, 'config'), { recursive: true });
+  await writeFile(configPath, JSON.stringify({
+    agents: [
+      { id: 'same', scannerType: 'generic', configDir: 'one', skillsDir: 'one/skills' },
+      { id: 'same', scannerType: 'generic', configDir: 'two', skillsDir: 'two/skills' },
+    ],
+  }));
+
+  await assert.rejects(() => loadAgentRegistry(configPath, []), /duplicate agent id: same/i);
+});

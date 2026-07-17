@@ -4,7 +4,7 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { GenericScanner } from './generic.js';
 import { createDefaultScannerRegistry } from './registry.js';
-import { createTempAgentRoot, withSuppressedConsoleWarn } from './test-utils.js';
+import { createTempAgentRoot } from './test-utils.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 
@@ -114,11 +114,21 @@ test('GenericScanner returns empty results for missing roots', async () => {
     skillsDir: 'C:/missing-agent/skills',
   });
 
-  const skills = await withSuppressedConsoleWarn(() => scanner.scanSkills());
-  const mcps = await scanner.scanMCP();
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+  let skills;
+  let mcps;
+  try {
+    skills = await scanner.scanSkills();
+    mcps = await scanner.scanMCP();
+  } finally {
+    console.warn = originalWarn;
+  }
 
   assert.deepEqual(skills, []);
   assert.deepEqual(mcps, []);
+  assert.deepEqual(warnings, []);
 });
 
 test('default scanner registry resolves generic scanner type', () => {

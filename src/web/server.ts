@@ -55,7 +55,7 @@ export function startWebServer(port: number, context: CommandContext): Promise<S
             res.end(JSON.stringify({ error: 'Missing task parameter' }));
           } else {
             const agents = await context.listAgents();
-            const policyPath = join(context.profilesDir, '..', 'routing-policy.json');
+            const policyPath = context.routingPolicyPath ?? join(context.profilesDir, '..', 'routing-policy.json');
             const result = await routeTask(task, policyPath, agents, context.db);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(result));

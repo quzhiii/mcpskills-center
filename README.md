@@ -47,6 +47,8 @@ The current release focuses on a practical local workflow:
 | Safe apply / restore | Explicit `--confirm`, approved-root checks, timestamped backups, restore manifests |
 | Profiles | Read-only planning for scenario-based capability bundles such as `coding` or `research` |
 | Health checks | Passive validation by default, explicit active command probing when allowlisted |
+| User configuration | Editable per-user config with bundled read-only defaults and safe initialization |
+| Doctor | Read-only runtime, config, storage, and agent diagnostics |
 | Dashboard | Static offline HTML report at `reports/dashboard.html` |
 
 Agent support status is summarized in `docs/supported-agents.md`.
@@ -65,7 +67,7 @@ Longer-term layers are a local Web control plane over the CLI kernel, then intel
 
 ## Quickstart
 
-Clone the repository, install dependencies, run the test suite, then generate the first inventory snapshot.
+Clone the repository, install dependencies, initialize user configuration, then generate the first inventory snapshot.
 
 Use Node.js 20 or Node.js 22-26. Node.js 22 or 24 LTS is recommended.
 
@@ -75,6 +77,10 @@ cd mcpskills-center
 
 npm install
 npm test
+npm run build
+node dist/index.js init
+node dist/index.js config validate
+node dist/index.js doctor
 npm run scan
 ```
 
@@ -82,8 +88,9 @@ Expected result:
 
 - TypeScript builds successfully into `dist/`.
 - Tests pass.
-- Generated reports appear under `reports/`.
-- `reports/dashboard.html` opens locally without external assets.
+- User configuration appears under the platform user data root.
+- Generated reports appear under `<user-data-root>/reports/`.
+- `<user-data-root>/reports/dashboard.html` opens locally without external assets.
 
 If you want a quick read-only sync plan next:
 
@@ -94,6 +101,14 @@ node dist/index.js sync --dry-run
 ---
 
 ## Outputs
+
+Writable state lives outside the npm package directory:
+
+| Platform | User data root |
+|---|---|
+| Windows | `%APPDATA%\mcpskills-center\` |
+| macOS | `~/Library/Application Support/mcpskills-center/` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/mcpskills-center/` |
 
 ### Main report set
 
@@ -114,7 +129,7 @@ node dist/index.js sync --dry-run
 - `reports/capability-matrix-current.json`
 - `reports/capability-matrix-current.md`
 
-`sync --apply --confirm` writes timestamped backup content under `backups/` and a consolidated manifest for the apply run.
+`sync --apply --confirm` writes timestamped backup content under `<user-data-root>/backups/` and a consolidated manifest for the apply run.
 
 ### Dashboard preview
 
@@ -134,6 +149,10 @@ Generated HTML is a reading surface. The JSON and Markdown reports remain the au
 
 | Command | Purpose | Writes |
 |---|---|---|
+| `mcpskills init [--dry-run]` | Create missing user configuration without overwriting existing files | User config only |
+| `mcpskills config path` | Show candidate and effective config paths and sources | None |
+| `mcpskills config validate` | Validate agents, sync, profiles, and routing config | None |
+| `mcpskills doctor` | Diagnose Node, config, storage, scanners, and optional agents | None |
 | `npm run scan` | Scan inventory, normalize records, audit findings, generate reports | `reports/` |
 | `npm run audit` | Print audit summary in the terminal | None |
 | `node dist/index.js sync --dry-run` | Generate a sync plan without changing agent config | `reports/` |
@@ -254,7 +273,7 @@ Active mode only probes allowlisted commands with `--version`, uses argument arr
 
 ## Profiles
 
-Sample profiles live in `config/profiles/` and are evaluated read-only against the current inventory.
+Sample profiles ship in `config/profiles/`. After `mcpskills init`, editable copies live under `<user-data-root>/config/profiles/` and are evaluated read-only against the current inventory.
 
 | Profile | Purpose | Agents |
 |---|---|---|
@@ -275,20 +294,39 @@ node dist/index.js profile plan coding
 
 ## Sync Approval Config
 
-Writable sync roots are controlled by `config/sync.json`.
+Writable sync roots are controlled by the effective `sync.json`. Run `mcpskills config path` to locate it.
 
 ```json
 {
   "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
+    "../canonical-skills",
+    "~/.claude/skills",
+    "~/.opencode/skills",
+    "~/.codex/skills"
   ]
 }
 ```
 
-Relative paths are resolved from the project root. Invalid values fail before an apply run begins.
+Relative paths are resolved from the directory containing the effective `sync.json`; `~` uses the current home directory. Invalid values fail before an apply run begins.
+
+## User Configuration
+
+`mcpskills init` copies bundled defaults into `<user-data-root>/config/`. Existing files are skipped. Overwrite of known MCPskills Center files requires both `--force` and `--confirm`; unknown profile files are preserved.
+
+For each configuration surface, an existing user file/directory replaces the bundled source as a whole. Missing user config falls back to bundled defaults (or generated sync defaults). Invalid user config fails validation and never silently falls back.
+
+```text
+<user-data-root>/
+├── config/
+│   ├── agents.json
+│   ├── sync.json
+│   ├── routing-policy.json
+│   └── profiles/
+├── canonical-skills/
+├── reports/
+├── backups/
+└── data/governance.db
+```
 
 ---
 
@@ -318,8 +356,6 @@ mcpskills-center/
 │   └── sync.json
 ├── docs/
 ├── fixtures/
-├── reports/
-├── backups/
 ├── src/
 ├── README.md
 └── README.zh-CN.md
@@ -336,8 +372,9 @@ Fixture policy:
 
 ## Boundaries
 
-- The current sample `config/sync.json` is machine-oriented and may need adjustment on another system.
-- Profile matching supports short MCP ids such as `playwright` against project-scoped ids such as `C:/Users/quzhi:playwright`.
+- Bundled `config/` is a read-only template/default source; edit user config instead.
+- This repository contains the 0.3.0 source milestone. It has not been published to npm; npm `latest` remains 0.2.2.
+- Profile matching supports short MCP ids such as `playwright` against project-scoped ids such as `<project-path>:playwright`.
 - Passive HTTP and SSE health checks validate preserved URL or host values when present in config.
 - Active health checks validate command reachability through `--version`; they do not perform a full MCP handshake.
 - OpenCode array-form commands are normalized to the leading executable name for health probing.

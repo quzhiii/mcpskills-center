@@ -3,6 +3,7 @@ import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
 import { parseClaudeCodeMcpConfig } from '../mcp/adapters/claude-code.js';
 import type { Skill, MCPServer } from '../types/index.js';
+import { isMissingPathError } from './errors.js';
 
 export class ClaudeCodeScanner extends BaseScanner {
   async scanSkills(): Promise<Skill[]> {
@@ -50,7 +51,9 @@ export class ClaudeCodeScanner extends BaseScanner {
         });
       }
     } catch (err) {
-      console.warn(`Warning: Could not read Claude Code skills dir: ${skillsDir}`, (err as Error).message);
+      if (!isMissingPathError(err)) {
+        console.warn(`Warning: Could not read Claude Code skills dir: ${skillsDir}`, (err as Error).message);
+      }
     }
 
     return skills;
@@ -89,7 +92,9 @@ export class ClaudeCodeScanner extends BaseScanner {
             hasSensitiveEnv: server.hasSensitiveEnv,
           }));
     } catch (err) {
-      console.warn(`Warning: Could not read Claude Code MCP config: ${mcpFile}`, (err as Error).message);
+      if (!isMissingPathError(err)) {
+        console.warn(`Warning: Could not read Claude Code MCP config: ${mcpFile}`, (err as Error).message);
+      }
       return [];
     }
   }

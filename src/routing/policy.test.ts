@@ -32,6 +32,18 @@ test('loadRoutingPolicy rejects missing version', async () => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('loadRoutingPolicy rejects malformed task categories', async () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), 'policy-test-'));
+  const configPath = join(tmpDir, 'routing-policy.json');
+  await writeFile(configPath, JSON.stringify({
+    version: '1',
+    taskCategories: [{ id: '', keywords: 'test', requiredCapabilities: [], eligibleAgents: [] }],
+    fallbackOrder: ['claude-code'],
+  }));
+  await assert.rejects(() => loadRoutingPolicy(configPath), /task category/i);
+  rmSync(tmpDir, { recursive: true, force: true });
+});
+
 test('matchTaskCategory finds matching category', () => {
   const policy: RoutingPolicy = {
     version: '1',

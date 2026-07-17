@@ -3,6 +3,7 @@ import { join, basename } from 'node:path';
 import { BaseScanner } from './base.js';
 import { parseCodexMcpConfig } from '../mcp/adapters/codex.js';
 import type { Skill, MCPServer } from '../types/index.js';
+import { isMissingPathError } from './errors.js';
 
 export class CodexScanner extends BaseScanner {
   async scanSkills(): Promise<Skill[]> {
@@ -52,7 +53,9 @@ export class CodexScanner extends BaseScanner {
         });
       }
     } catch (err) {
-      console.warn(`Warning: Could not read Codex skills dir: ${skillsDir}`, (err as Error).message);
+      if (!isMissingPathError(err)) {
+        console.warn(`Warning: Could not read Codex skills dir: ${skillsDir}`, (err as Error).message);
+      }
     }
 
     return skills;
@@ -91,7 +94,9 @@ export class CodexScanner extends BaseScanner {
           hasSensitiveEnv: server.hasSensitiveEnv,
         }));
     } catch (err) {
-      console.warn(`Warning: Could not read Codex MCP config: ${mcpFile}`, (err as Error).message);
+      if (!isMissingPathError(err)) {
+        console.warn(`Warning: Could not read Codex MCP config: ${mcpFile}`, (err as Error).message);
+      }
       return [];
     }
   }

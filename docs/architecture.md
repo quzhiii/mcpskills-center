@@ -8,15 +8,13 @@ Technical architecture of MCPskills Center for contributors.
 
 ```text
 mcpskills-center/
-├── config/
-│   ├── profiles/          # Profile definitions (coding, research, etc.)
-│   ├── agents.json        # Agent registry
-│   ├── routing-policy.json # Routing policy
-│   └── sync.json          # Approved sync roots
+├── config/                # Bundled read-only templates and defaults
+│   ├── profiles/          # Default profile definitions
+│   ├── agents.json        # Default agent registry
+│   ├── routing-policy.json # Default routing policy
+│   └── sync.json          # Portable sync template
 ├── docs/                  # Documentation
 ├── fixtures/              # Test fixtures (synthetic skill samples)
-├── reports/               # Generated reports (gitignored)
-├── backups/               # Backup manifests and files (gitignored)
 └── src/
     ├── agents/            # Agent support level descriptions
     ├── auditor/           # Audit rule engine
@@ -43,6 +41,8 @@ mcpskills-center/
     ├── index.ts           # Main orchestrator
     └── index.test.ts      # Integration tests
 ```
+
+Writable config and runtime state use the platform user data root, with `config/`, `canonical-skills/`, `reports/`, `backups/`, and `data/` subdirectories. User configuration has precedence over bundled defaults.
 
 ---
 

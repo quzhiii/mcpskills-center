@@ -68,3 +68,21 @@ test('parseCliArgs parses sync restore manifest path', () => {
   assert.equal(parsed.command, 'sync');
   assert.equal(parsed.options.restoreManifestPath, 'C:/backups/manifest.json');
 });
+
+test('parseCliArgs parses init safety flags', () => {
+  const parsed = parseCliArgs(['init', '--dry-run', '--force', '--confirm']);
+
+  assert.equal(parsed.command, 'init');
+  assert.equal(parsed.options.dryRun, true);
+  assert.equal(parsed.options.force, true);
+  assert.equal(parsed.options.confirm, true);
+});
+
+test('parseCliArgs parses config subcommands', () => {
+  assert.equal(parseCliArgs(['config', 'path']).options.subcommand, 'path');
+  assert.equal(parseCliArgs(['config', 'validate']).options.subcommand, 'validate');
+});
+
+test('parseCliArgs parses doctor command', () => {
+  assert.equal(parseCliArgs(['doctor']).command, 'doctor');
+});

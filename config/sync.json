@@ -1,8 +1,7 @@
 {
   "approvedSyncRoots": [
-    "config/canonical-skills",
-    "C:/Users/quzhi/.claude/skills",
-    "C:/Users/quzhi/.opencode/skills",
-    "C:/Users/quzhi/.codex/skills"
+    "~/.claude/skills",
+    "~/.opencode/skills",
+    "~/.codex/skills"
   ]
 }
