@@ -72,7 +72,7 @@ export function renderConfigDiagnostics(diagnostics: ConfigDiagnostic[]): string
     'Configuration validation:',
     ...diagnostics.map(item => {
       const remediation = item.remediation ? ` Fix: ${item.remediation}` : '';
-      return `   [${item.status.toUpperCase()}] ${item.message}${remediation}`;
+      return `   [${item.status.toUpperCase()}] ${item.id}: ${item.message}${remediation}`;
     }),
   ].join('\n');
 }

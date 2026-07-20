@@ -77,3 +77,17 @@ test('runDoctor reports unsupported Node and invalid config without leaking valu
   assert.equal(output.includes('secret-value'), false);
   assert.match(output, /No secret values were inspected or included/);
 });
+
+test('renderDoctorReport includes diagnostic identifiers for actionable output', () => {
+  const output = renderDoctorReport({
+    diagnostics: [{
+      id: 'runtime.node',
+      status: 'warning',
+      message: 'Node.js 25 is supported but is not covered by the CI matrix.',
+      remediation: 'Prefer Node.js 20, 22, or 24.',
+    }],
+  });
+
+  assert.match(output, /\[WARNING\] runtime\.node: Node\.js 25/);
+  assert.match(output, /Fix: Prefer Node\.js 20, 22, or 24\./);
+});

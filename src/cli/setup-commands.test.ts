@@ -55,6 +55,7 @@ test('config validate returns an aggregated validation summary', async () => {
 
   assert.match(output ?? '', /Configuration validation/);
   assert.match(output ?? '', /\[OK\]/);
+  assert.match(output ?? '', /agents\.config/);
   await assert.rejects(() => access(paths.governanceDbPath), { code: 'ENOENT' });
 });
 
