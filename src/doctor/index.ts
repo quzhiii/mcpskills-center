@@ -73,7 +73,7 @@ export function renderDoctorReport(report: DoctorReport): string {
     'MCPskills Center doctor:',
     ...report.diagnostics.map(diagnostic => {
       const remediation = diagnostic.remediation ? ` Fix: ${diagnostic.remediation}` : '';
-      return `   [${diagnostic.status.toUpperCase()}] ${diagnostic.message}${remediation}`;
+      return `   [${diagnostic.status.toUpperCase()}] ${diagnostic.id}: ${diagnostic.message}${remediation}`;
     }),
     '',
     `Summary: ${counts.ok} ok, ${counts.warning} warning, ${counts.error} error, ${counts.skipped} skipped`,
